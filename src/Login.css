@@ -1,0 +1,388 @@
+/* ===== Pantalla de inicio de sesión ===== */
+.login {
+  --morado: #4b1e4d;
+  --morado-oscuro: #2b102d;
+  --aji: #f2a900;
+  --tinta: #241529;
+  --suave: #6f6477;
+  --linea: #ddd5e3;
+  --fondo: #f5f2f7;
+  --error: #b3261e;
+  --ok: #2e7d4f;
+
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  /* minmax(0, …) fija el ancho de cada columna: no cambia según lo que haya dentro */
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  background: var(--fondo);
+  color: var(--tinta);
+}
+
+/* ---------- Panel de la foto ---------- */
+.login-foto {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 48px 56px;
+  color: #fff;
+  overflow: hidden;
+  background:
+    linear-gradient(160deg, rgba(43, 16, 45, 0.82) 0%, rgba(43, 16, 45, 0.9) 100%),
+    url('/fondo-login.jpg') center / cover no-repeat,
+    var(--morado-oscuro);
+}
+
+.login-marca {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.login-logo {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--aji);
+  font-size: 22px;
+}
+
+.login-mensaje {
+  max-width: 460px;
+}
+
+.login-mensaje h2 {
+  margin: 0 0 16px;
+  font-size: 40px;
+  line-height: 1.1;
+  font-weight: 800;
+}
+
+.login-mensaje p {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.login-puntos {
+  display: grid;
+  gap: 10px;
+  margin: 28px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.login-puntos li::before {
+  content: '✓';
+  display: inline-block;
+  width: 22px;
+  color: var(--aji);
+  font-weight: 800;
+}
+
+.login-credito {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.login-credito a {
+  color: inherit;
+}
+
+/* ---------- Panel del formulario ---------- */
+.login-panel {
+  display: flex;
+  justify-content: center;
+  /* Arriba y con margen fijo: la tarjeta no se mueve aunque cambie de altura */
+  align-items: flex-start;
+  padding: clamp(40px, 14vh, 140px) 24px 40px;
+}
+
+.login-tarjeta {
+  width: 100%;
+  max-width: 420px;
+  padding: 40px 36px;
+  background: #fff;
+  border: 1px solid #ece6f0;
+  border-radius: 18px;
+  box-shadow: 0 24px 60px -24px rgba(36, 21, 41, 0.25);
+}
+
+.login-tarjeta h1 {
+  margin: 0 0 6px;
+  font-size: 26px;
+  line-height: 1.2;
+  font-weight: 800;
+}
+
+.login-sub {
+  margin: 0 0 28px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--suave);
+}
+
+/* Selector Personal / Administración: mismo grosor de letra en ambos estados */
+.login-segmento {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 24px;
+  background: var(--fondo);
+  border-radius: 12px;
+}
+
+.login-segmento button {
+  min-width: 0;
+  padding: 10px 8px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--suave);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.login-segmento button[aria-pressed='true'] {
+  background: #fff;
+  color: var(--morado);
+  box-shadow: 0 1px 3px rgba(36, 21, 41, 0.15);
+}
+
+/* ---------- Campos ---------- */
+.login-form {
+  display: grid;
+  gap: 18px;
+}
+
+.login-campo {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.login-campo label {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.login-campo input {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--linea);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--tinta);
+  font: inherit;
+  font-size: 16px; /* 16px evita el zoom automático en iPhone */
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.login-campo input:focus {
+  outline: none;
+  border-color: var(--morado);
+  box-shadow: 0 0 0 3px rgba(75, 30, 77, 0.15);
+}
+
+.login-clave {
+  position: relative;
+}
+
+.login-clave input {
+  padding-right: 88px;
+}
+
+.login-ver {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  width: 72px;
+  padding: 6px 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--morado);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.login-ver:hover {
+  background: var(--fondo);
+}
+
+.login-fila {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -6px;
+}
+
+.login-enlace {
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: var(--morado);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ---------- Botón principal ---------- */
+.login-boton {
+  width: 100%;
+  height: 50px;
+  margin-top: 6px;
+  border: none;
+  border-radius: 10px;
+  background: var(--morado);
+  color: #fff;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.login-boton:hover:not(:disabled) {
+  background: var(--morado-oscuro);
+}
+
+.login-boton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ---------- Mensajes ---------- */
+.login-alerta {
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.login-alerta.error {
+  background: #fdf0ef;
+  color: var(--error);
+  border: 1px solid #f3c9c5;
+}
+
+.login-alerta.ok {
+  background: #eef7f1;
+  color: var(--ok);
+  border: 1px solid #c4e3cf;
+}
+
+.login-nota {
+  margin: 22px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--suave);
+  text-align: center;
+}
+
+.login-volver {
+  margin-top: 22px;
+  text-align: center;
+}
+
+.login button:focus-visible,
+.login a:focus-visible {
+  outline: 3px solid rgba(242, 169, 0, 0.8);
+  outline-offset: 2px;
+}
+
+/* ===== Tablet horizontal / notebook chico ===== */
+@media (max-width: 1100px) {
+  .login-foto {
+    padding: 40px;
+  }
+
+  .login-mensaje h2 {
+    font-size: 32px;
+  }
+}
+
+/* ===== Celular y tablet vertical: foto arriba como franja, formulario debajo ===== */
+@media (max-width: 860px) {
+  .login {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-content: start;
+  }
+
+  .login-foto {
+    position: static;
+    height: auto;
+    padding: 20px;
+    gap: 14px;
+    justify-content: flex-start;
+  }
+
+  .login-marca {
+    font-size: 17px;
+  }
+
+  .login-logo {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+    border-radius: 10px;
+  }
+
+  .login-mensaje h2 {
+    margin: 0;
+    font-size: 22px;
+  }
+
+  .login-mensaje p,
+  .login-puntos {
+    display: none;
+  }
+
+  .login-panel {
+    padding: 24px 16px 32px;
+  }
+
+  .login-tarjeta {
+    padding: 28px 20px;
+    box-shadow: 0 12px 32px -20px rgba(36, 21, 41, 0.3);
+  }
+
+  .login-tarjeta h1 {
+    font-size: 22px;
+  }
+
+  .login-sub {
+    margin-bottom: 22px;
+  }
+}
+
+/* Celulares muy angostos */
+@media (max-width: 360px) {
+  .login-segmento button {
+    font-size: 13px;
+  }
+}
