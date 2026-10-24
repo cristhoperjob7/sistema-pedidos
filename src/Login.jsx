@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import './Login.css'
+import { sentir, sonar, vibrar } from './feedback'
 
 // Cambia aquí el nombre que se muestra en el sistema.
 export const MARCA = 'Sistema de Pedidos'
@@ -73,7 +74,14 @@ function CampoClave({ id, label, value, onChange, autoComplete, inputMode, autoF
           autoFocus={autoFocus}
           required
         />
-        <button type="button" className="login-ver" onClick={() => setVer((v) => !v)}>
+        <button
+          type="button"
+          className="login-ver"
+          onClick={() => {
+            sentir('toque', 'tic')
+            setVer((v) => !v)
+          }}
+        >
           {ver ? 'Ocultar' : 'Mostrar'}
         </button>
       </div>
@@ -99,6 +107,7 @@ export default function Login({ avisoInicial = '' }) {
   }, [espera])
 
   function cambiarModo(nuevo) {
+    if (nuevo !== modo) sentir('toque', 'tic')
     setModo(nuevo)
     setError('')
     setOk('')
@@ -107,21 +116,28 @@ export default function Login({ avisoInicial = '' }) {
 
   async function entrar(e) {
     e.preventDefault()
+    sentir('toque')
     setError('')
     setTrabajando(true)
 
     if (modo === 'admin') {
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: clave })
-      if (error) setError('Correo o contraseña incorrectos.')
+      if (error) {
+        vibrar('error')
+        setError('Correo o contraseña incorrectos.')
+      } else sonar('exito')
     } else {
       const { data, error } = await supabase.functions.invoke('personal', {
         body: { accion: 'login', slug: codigo.trim(), username: usuario.trim(), pin: clave },
       })
       if (error) {
+        vibrar('error')
         setError('No se pudo conectar con el servidor. Revisa tu conexión a internet e intenta de nuevo.')
       } else if (!data.ok) {
+        vibrar('error')
         setError(data.error)
       } else {
+        sonar('exito')
         guardarCodigo(codigo.trim().toLowerCase())
         await supabase.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token })
       }
@@ -131,6 +147,7 @@ export default function Login({ avisoInicial = '' }) {
 
   async function recuperar(e) {
     e.preventDefault()
+    sentir('toque')
     setError('')
     setOk('')
     setTrabajando(true)
@@ -143,6 +160,8 @@ export default function Login({ avisoInicial = '' }) {
       return
     }
     // Por seguridad no se dice si el correo existe o no.
+    vibrar('exito')
+    sonar('exito')
     setOk('Si el correo está registrado, te enviamos un enlace para crear una nueva contraseña. Revisa también la carpeta de spam.')
     setEspera(60)
   }
@@ -167,10 +186,18 @@ export default function Login({ avisoInicial = '' }) {
               required
             />
           </div>
-          {error && <div className="login-alerta error">{error}</div>}
-          {ok && <div className="login-alerta ok">{ok}</div>}
+          {error && (
+            <div key={error} className="login-alerta error" role="alert">
+              {error}
+            </div>
+          )}
+          {ok && (
+            <div className="login-alerta ok" role="status">
+              {ok}
+            </div>
+          )}
           <button className="login-boton" disabled={trabajando || espera > 0}>
-            {trabajando ? 'Enviando...' : espera > 0 ? `Puedes reenviar en ${espera} s` : 'Enviar enlace'}
+            {trabajando ? <span className="puntos">Enviando</span> : espera > 0 ? `Puedes reenviar en ${espera} s` : 'Enviar enlace'}
           </button>
         </form>
         <div className="login-volver">
@@ -187,7 +214,7 @@ export default function Login({ avisoInicial = '' }) {
       <h1>Iniciar sesión</h1>
       <p className="login-sub">Ingresa con tus datos de acceso.</p>
 
-      <div className="login-segmento" role="group" aria-label="Tipo de acceso">
+      <div className="login-segmento" data-pos={modo === 'admin' ? 1 : 0} role="group" aria-label="Tipo de acceso">
         <button type="button" aria-pressed={modo === 'personal'} onClick={() => cambiarModo('personal')}>
           Personal del local
         </button>
@@ -196,7 +223,7 @@ export default function Login({ avisoInicial = '' }) {
         </button>
       </div>
 
-      <form className="login-form" onSubmit={entrar}>
+      <form key={modo} className="login-form login-cambia" onSubmit={entrar}>
         {modo === 'personal' ? (
           <>
             <div className="login-campo">
@@ -260,10 +287,14 @@ export default function Login({ avisoInicial = '' }) {
           </>
         )}
 
-        {error && <div className="login-alerta error">{error}</div>}
+        {error && (
+          <div key={error} className="login-alerta error" role="alert">
+            {error}
+          </div>
+        )}
 
         <button className="login-boton" disabled={trabajando}>
-          {trabajando ? 'Entrando...' : 'Entrar'}
+          {trabajando ? <span className="puntos">Entrando</span> : 'Entrar'}
         </button>
       </form>
 
@@ -285,8 +316,15 @@ export function NuevaClave({ onListo }) {
   async function guardar(e) {
     e.preventDefault()
     setError('')
-    if (clave.length < 8) return setError('La contraseña debe tener al menos 8 caracteres.')
-    if (clave !== repetir) return setError('Las contraseñas no coinciden.')
+    if (clave.length < 8) {
+      vibrar('error')
+      return setError('La contraseña debe tener al menos 8 caracteres.')
+    }
+    if (clave !== repetir) {
+      vibrar('error')
+      return setError('Las contraseñas no coinciden.')
+    }
+    sentir('toque')
     setTrabajando(true)
     const { error } = await supabase.auth.updateUser({ password: clave })
     setTrabajando(false)
@@ -298,19 +336,24 @@ export function NuevaClave({ onListo }) {
       )
       return
     }
+    vibrar('exito')
+    sonar('exito')
     setListo(true)
   }
 
   return (
     <Marco>
       {listo ? (
-        <>
+        <div className="login-cambia">
+          <div className="login-listo" aria-hidden="true">
+            ✓
+          </div>
           <h1>Contraseña actualizada</h1>
           <p className="login-sub">Tu nueva contraseña ya está activa.</p>
           <button className="login-boton" style={{ width: '100%' }} onClick={onListo}>
             Ir al panel
           </button>
-        </>
+        </div>
       ) : (
         <>
           <h1>Crea una nueva contraseña</h1>
@@ -331,9 +374,13 @@ export function NuevaClave({ onListo }) {
               onChange={setRepetir}
               autoComplete="new-password"
             />
-            {error && <div className="login-alerta error">{error}</div>}
+            {error && (
+              <div key={error} className="login-alerta error" role="alert">
+                {error}
+              </div>
+            )}
             <button className="login-boton" disabled={trabajando}>
-              {trabajando ? 'Guardando...' : 'Guardar contraseña'}
+              {trabajando ? <span className="puntos">Guardando</span> : 'Guardar contraseña'}
             </button>
           </form>
         </>

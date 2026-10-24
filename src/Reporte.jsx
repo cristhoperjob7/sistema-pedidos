@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabase'
 import { formatear } from './moneda'
+import { Cargando, Desplegable, Mensaje, NumeroAnimado } from './ui'
+import { sentir } from './feedback'
 
 // Fecha de hoy (AAAA-MM-DD) en la zona horaria del restaurante.
 function hoyEn(zona) {
@@ -24,6 +26,7 @@ export default function Reporte({ restaurante }) {
   const [error, setError] = useState('')
   const [recarga, setRecarga] = useState(0)
   const [verDetalle, setVerDetalle] = useState(false)
+  const [girando, setGirando] = useState(0) // para que el ícono ↻ dé una vuelta al actualizar
 
   useEffect(() => {
     supabase
@@ -155,35 +158,49 @@ export default function Reporte({ restaurante }) {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <input
             type="date"
-            style={s.fecha}
+            className="campo-chico"
             value={dia}
             max={hoyEn(restaurante.zona_horaria)}
             onChange={(e) => e.target.value && setDia(e.target.value)}
           />
-          <button style={s.botonSec} onClick={() => setRecarga((n) => n + 1)}>
+          <button
+            className="btn btn-chico btn-sec"
+            onClick={() => {
+              sentir('toque', 'tic')
+              setGirando((n) => n + 1)
+              setRecarga((n) => n + 1)
+            }}
+          >
+            <span key={girando} style={girando ? s.gira : undefined} aria-hidden="true">
+              ↻
+            </span>
             Actualizar
           </button>
         </div>
       </div>
 
-      {error && <p style={{ color: 'crimson', margin: 0 }}>{error}</p>}
-      {!r && !error && <p>Cargando...</p>}
+      <Mensaje tipo="error">{error}</Mensaje>
+      {!r && !error && <Cargando filas={3} alto={80} />}
 
       {r && (
         <>
           <div className="aparece" style={s.kpis}>
-            <div style={s.kpi}>
-              <small style={s.suave}>Vendido</small>
-              <b style={s.kpiValor}>{formatear(r.vendido, restaurante)}</b>
+            <div style={{ ...s.kpi, ...s.kpiPrincipal }}>
+              <small style={{ opacity: 0.8 }}>Vendido</small>
+              <b style={s.kpiValor}>
+                <NumeroAnimado valor={r.vendido} formato={(n) => formatear(n, restaurante)} />
+              </b>
             </div>
             <div style={s.kpi}>
               <small style={s.suave}>Cuentas cerradas</small>
-              <b style={s.kpiValor}>{r.cuentas}</b>
+              <b style={s.kpiValor}>
+                <NumeroAnimado valor={r.cuentas} />
+              </b>
             </div>
             <div style={s.kpi}>
               <small style={s.suave}>Anulado</small>
               <b style={{ ...s.kpiValor, color: r.anul.monto > 0 ? '#B3261E' : undefined }}>
-                {formatear(r.anul.monto, restaurante)}
+                <NumeroAnimado valor={r.anul.monto} formato={(n) => formatear(n, restaurante)} />
               </b>
               <small style={s.suave}>{r.anul.porcentaje.toFixed(1)}% de lo pedido</small>
             </div>
@@ -206,21 +223,34 @@ export default function Reporte({ restaurante }) {
                 <h4 style={s.titulo}>
                   {info.icono} {info.titulo}
                 </h4>
-                {lista.map(([nombre, cantidad]) => (
-                  <div key={nombre} style={s.barra}>
-                    <span style={{ width: 130, flex: 'none', fontSize: 14 }}>{nombre}</span>
-                    <i style={{ ...s.relleno, width: `${Math.max(6, (cantidad / maximo) * 55)}%` }} />
-                    <b>{cantidad}</b>
-                  </div>
-                ))}
+                <div className="tarjeta" style={s.barras}>
+                  {lista.map(([nombre, cantidad], i) => (
+                    <div key={nombre} style={s.barra}>
+                      <span style={s.barraNombre}>{nombre}</span>
+                      <span style={s.pista}>
+                        <i
+                          className="barra-crece"
+                          style={{
+                            ...s.relleno,
+                            width: `${Math.max(6, (cantidad / maximo) * 100)}%`,
+                            animationDelay: `${i * 70}ms`,
+                          }}
+                        />
+                      </span>
+                      <b className="numero" style={{ minWidth: 24, textAlign: 'right' }}>
+                        {cantidad}
+                      </b>
+                    </div>
+                  ))}
+                </div>
               </div>
             )
           })}
 
           <h4 style={s.titulo}>Por salón</h4>
           {r.meseras.length === 0 && <small style={s.suave}>Sin ventas todavía.</small>}
-          {r.meseras.map(([nombre, m]) => (
-            <div key={nombre} style={s.fila}>
+          {r.meseras.map(([nombre, m], i) => (
+            <div key={nombre} className="entra" style={{ ...s.fila, animationDelay: `${i * 40}ms` }}>
               <span>
                 {nombre} <small style={s.suave}>· {m.cuentas} cuenta(s)</small>
               </span>
@@ -230,8 +260,8 @@ export default function Reporte({ restaurante }) {
 
           <h4 style={s.titulo}>Por método de pago</h4>
           {r.pagos.length === 0 && <small style={s.suave}>Sin ventas todavía.</small>}
-          {r.pagos.map(([nombre, total]) => (
-            <div key={nombre} style={s.fila}>
+          {r.pagos.map(([nombre, total], i) => (
+            <div key={nombre} className="entra" style={{ ...s.fila, animationDelay: `${i * 40}ms` }}>
               <span>{nombre}</span>
               <b>{formatear(total, restaurante)}</b>
             </div>
@@ -273,14 +303,25 @@ export default function Reporte({ restaurante }) {
                 </p>
               ))}
 
-              <button style={{ ...s.botonSec, marginTop: 8 }} onClick={() => setVerDetalle((v) => !v)}>
+              <button
+                className="btn btn-chico btn-sec"
+                style={{ marginTop: 10 }}
+                aria-expanded={verDetalle}
+                onClick={() => {
+                  sentir('toque')
+                  setVerDetalle((v) => !v)
+                }}
+              >
                 {verDetalle ? 'Ocultar detalle' : `Ver detalle por pedido (${r.anul.detalle.length})`}
+                <span style={{ ...s.flecha, transform: verDetalle ? 'rotate(180deg)' : 'none' }} aria-hidden="true">
+                  ▾
+                </span>
               </button>
             </div>
           )}
 
-          {verDetalle &&
-            r.anul.detalle.map((a) => (
+          <Desplegable abierto={verDetalle} style={{ display: 'grid', gap: 10 }}>
+            {r.anul.detalle.map((a) => (
               <div key={a.id} style={s.grupo}>
                 <div style={s.grupoCabecera}>
                   <b>
@@ -299,6 +340,7 @@ export default function Reporte({ restaurante }) {
                 ))}
               </div>
             ))}
+          </Desplegable>
         </>
       )}
     </div>
@@ -307,19 +349,29 @@ export default function Reporte({ restaurante }) {
 
 const s = {
   cabecera: { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
-  fecha: { padding: 8, fontSize: 15, borderRadius: 8, border: '1px solid #bbb' },
-  botonSec: { padding: 8, fontSize: 14, borderRadius: 8, border: '1px solid #bbb', background: 'white', cursor: 'pointer' },
-  kpis: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 },
-  kpi: { background: 'white', border: '1px solid #e2dce8', borderRadius: 14, padding: 14, display: 'grid', gap: 2 },
-  kpiValor: { fontSize: 24, fontWeight: 800 },
+  gira: { display: 'inline-block', animation: 'gira 600ms var(--resorte)' },
+  flecha: { display: 'inline-block', transition: 'transform 320ms var(--resorte)' },
+  kpis: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px, 100%), 1fr))', gap: 12 },
+  kpi: { background: 'white', border: '1px solid var(--linea)', borderRadius: 18, padding: 14, display: 'grid', gap: 2, boxShadow: 'var(--sombra)' },
+  kpiPrincipal: {
+    gridColumn: '1 / -1',
+    color: 'white',
+    border: 'none',
+    background: 'linear-gradient(135deg, #5c2a5f 0%, #4B1E4D 60%, #3a173c 100%)',
+    boxShadow: '0 14px 30px -18px rgba(75,30,77,.9)',
+  },
+  kpiValor: { fontSize: 'clamp(22px, 6vw, 26px)', fontWeight: 900 },
   suave: { color: '#6f6477' },
   titulo: { margin: '12px 0 2px', fontSize: 16 },
   subtitulo: { display: 'block', fontSize: 14, margin: '10px 0 2px' },
+  barras: { display: 'grid', gap: 10, borderRadius: 16 },
   barra: { display: 'flex', alignItems: 'center', gap: 10 },
-  relleno: { display: 'block', height: 10, borderRadius: 5, background: '#F2A900' },
+  barraNombre: { width: '38%', flex: 'none', fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  pista: { flex: 1, height: 12, borderRadius: 99, background: 'var(--lavanda)', overflow: 'hidden' },
+  relleno: { display: 'block', height: '100%', borderRadius: 99, background: 'linear-gradient(90deg, #FFC23D, #F2A900)' },
   resumen: { display: 'grid', gap: 4, fontSize: 14 },
-  grupo: { background: 'white', border: '1px solid #e2dce8', borderRadius: 12, padding: '10px 12px' },
-  grupoCabecera: { display: 'flex', justifyContent: 'space-between', paddingBottom: 6, marginBottom: 6, borderBottom: '1px solid #e2dce8' },
-  grupoLinea: { display: 'flex', justifyContent: 'space-between', margin: 0, fontSize: 14, padding: '2px 0' },
-  fila: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', border: '1px solid #e2dce8', borderRadius: 12, padding: '10px 12px' },
+  grupo: { background: 'white', border: '1px solid var(--linea)', borderRadius: 16, padding: '10px 12px', boxShadow: 'var(--sombra)' },
+  grupoCabecera: { display: 'flex', justifyContent: 'space-between', gap: 8, paddingBottom: 6, marginBottom: 6, borderBottom: '1px solid var(--linea)' },
+  grupoLinea: { display: 'flex', justifyContent: 'space-between', gap: 8, margin: 0, fontSize: 14, padding: '2px 0' },
+  fila: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, background: 'white', border: '1px solid var(--linea)', borderRadius: 14, padding: '10px 12px', boxShadow: 'var(--sombra)' },
 }

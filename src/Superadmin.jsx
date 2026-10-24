@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import Admin from './Admin'
 import Anclar from './Anclar'
+import { Cargando, Desplegable, Mensaje } from './ui'
+import { avisar, celebrar, sentir, sonar, vibrar } from './feedback'
 
 // Monedas sugeridas. Los campos siguen siendo editables para usar cualquier otra.
 const MONEDAS = [
@@ -18,7 +20,7 @@ const MONEDAS = [
 function crearSlug(texto) {
   return texto
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
@@ -39,11 +41,10 @@ const ZONAS = [
 const FORM_INICIAL = { nombre: '', slug: '', codigo: 'CLP', simbolo: '$', decimales: 0, zona: 'America/Santiago' }
 
 export default function Superadmin() {
-  const [lista, setLista] = useState([])
+  const [lista, setLista] = useState(null)
   const [form, setForm] = useState(FORM_INICIAL)
   const [slugManual, setSlugManual] = useState(false)
   const [error, setError] = useState('')
-  const [aviso, setAviso] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [abierto, setAbierto] = useState(null)
   const [borrando, setBorrando] = useState(null) // id del restaurante que se está confirmando borrar
@@ -74,12 +75,13 @@ export default function Superadmin() {
 
   async function crear(e) {
     e.preventDefault()
+    const boton = e.nativeEvent?.submitter
     setError('')
-    setAviso('')
     if (!form.nombre.trim() || !form.slug.trim() || !form.codigo.trim() || !form.simbolo.trim()) {
       setError('Completa el nombre, el código, la moneda y el símbolo.')
       return
     }
+    sentir('toque')
     setGuardando(true)
     const { error } = await supabase.from('restaurantes').insert({
       nombre: form.nombre.trim(),
@@ -94,7 +96,10 @@ export default function Superadmin() {
       setError(error.code === '23505' ? 'Ese código de restaurante ya existe, usa otro.' : error.message)
       return
     }
-    setAviso('Restaurante creado.')
+    celebrar(boton)
+    vibrar('exito')
+    sonar('exito')
+    avisar(`Restaurante "${form.nombre.trim()}" creado`)
     setForm(FORM_INICIAL)
     setSlugManual(false)
     setMostrarCrear(false)
@@ -102,21 +107,36 @@ export default function Superadmin() {
   }
 
   async function alternar(r) {
+    sentir('toque', 'tic')
     const { error } = await supabase.from('restaurantes').update({ activo: !r.activo }).eq('id', r.id)
     if (error) setError(error.message)
-    else cargar()
+    else {
+      avisar(r.activo ? `${r.nombre} desactivado` : `${r.nombre} activado`, r.activo ? 'info' : 'ok')
+      cargar()
+    }
   }
 
   async function cambiarZona(r, zona) {
     setError('')
     const { error } = await supabase.from('restaurantes').update({ zona_horaria: zona }).eq('id', r.id)
     if (error) setError(error.message)
-    else cargar()
+    else {
+      sentir('toque', 'tic')
+      avisar('Zona horaria guardada')
+      cargar()
+    }
+  }
+
+  function alternarAdmin(r) {
+    sentir('toque')
+    setBorrando(null)
+    setAbierto(abierto === r.id ? null : r.id)
   }
 
   function pedirBorrar(r) {
+    sentir('aviso')
     setAbierto(null) // si estaba abierto "Administrar", se cierra para dejar ver la confirmación
-    setBorrando(r.id)
+    setBorrando(borrando === r.id ? null : r.id)
     setClaveBorrar('')
     setNombreBorrar('')
     setErrorBorrar('')
@@ -139,6 +159,7 @@ export default function Superadmin() {
       setErrorBorrar('Ingresa tu contraseña de superadmin para confirmar.')
       return
     }
+    sentir('aviso')
     setEliminando(true)
     // Vuelve a validar tu propia clave antes de borrar nada (paso de seguridad).
     const { data: quien } = await supabase.auth.getUser()
@@ -156,7 +177,8 @@ export default function Superadmin() {
       return
     }
     cancelarBorrar()
-    setAviso(`Restaurante "${r.nombre}" eliminado junto con todos sus datos.`)
+    sonar('baja')
+    avisar(`"${r.nombre}" eliminado con todos sus datos`, 'borrar')
     cargar()
   }
 
@@ -165,163 +187,210 @@ export default function Superadmin() {
   // (encogiéndose, no de golpe) para no competir visualmente con esa tarea.
   const hayPanelAbierto = abierto !== null || borrando !== null
 
+  if (!lista) return error ? <Mensaje tipo="error">{error}</Mensaje> : <Cargando filas={2} alto={110} />
+
   return (
     <div style={s.pagina}>
-      <h2 style={{ margin: 0 }}>Restaurantes ({lista.length})</h2>
-      {error && <p style={{ color: 'crimson', margin: 0 }}>{error}</p>}
-      {aviso && <p style={{ color: 'green', margin: 0 }}>{aviso}</p>}
+      <h2 style={{ margin: '0 0 4px' }}>
+        Restaurantes{' '}
+        <small className="suave" style={{ fontWeight: 700 }}>
+          · <span key={lista.length} className="contador-pop">{lista.length}</span>
+        </small>
+      </h2>
+      <Mensaje tipo="error">{error}</Mensaje>
 
-      {lista.map((r) => (
-        <div key={r.id}>
-          <div style={s.tarjeta}>
-          <div>
-            <b>{r.nombre}</b>
-            <br />
-            <small>
-              Código: {r.slug} · Moneda: {r.moneda_codigo} ({r.moneda_simbolo}), {r.moneda_decimales} decimales
-            </small>
-            <br />
-            <small>
-              Zona horaria:{' '}
-              <select
-                value={r.zona_horaria ?? 'America/Santiago'}
-                onChange={(e) => cambiarZona(r, e.target.value)}
-                style={{ fontSize: 13 }}
-              >
-                {ZONAS.map(([zona, nombre]) => (
-                  <option key={zona} value={zona}>
-                    {nombre}
-                  </option>
-                ))}
-                {!ZONAS.some(([zona]) => zona === r.zona_horaria) && r.zona_horaria && (
-                  <option value={r.zona_horaria}>{r.zona_horaria}</option>
-                )}
-              </select>
-            </small>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button style={s.botonSec} onClick={() => setAbierto(abierto === r.id ? null : r.id)}>
-              {abierto === r.id ? 'Cerrar' : 'Administrar'}
-            </button>
-            <button style={r.activo ? s.botonSec : s.boton} onClick={() => alternar(r)}>
-              {r.activo ? 'Desactivar' : 'Activar'}
-            </button>
-            <button style={s.botonPeligro} onClick={() => pedirBorrar(r)}>
-              Eliminar
-            </button>
-          </div>
-          </div>
-          {abierto === r.id && (
-            <div className="aparece" style={s.panelAdmin}>
-              <Anclar block="start" />
-              <b style={s.panelAdminTitulo}>Administrando: {r.nombre}</b>
-              <Admin restaurante={r} />
-            </div>
-          )}
+      {lista.length === 0 && (
+        <div className="vacio">
+          <span className="vacio-icono">🏪</span>
+          <b>Todavía no hay restaurantes</b>
+          <span>Crea el primero con el botón de abajo.</span>
+        </div>
+      )}
 
-          {borrando === r.id && (
-            <div className="aparece" style={s.confirmar}>
-              <Anclar block="center" />
-              <p style={{ margin: 0, fontWeight: 700, color: '#B3261E' }}>
-                Vas a eliminar "{r.nombre}" para siempre
-              </p>
-              <small>
-                Se borran también su menú, mesas, personal (sus credenciales siguen sirviendo para otros
-                restaurantes), pedidos y reportes. No se puede deshacer.
-              </small>
-              <label style={s.label}>
-                Para confirmar, escribe el nombre exacto del restaurante: <b>{r.nombre}</b>
-                <input style={s.input} value={nombreBorrar} onChange={(e) => setNombreBorrar(e.target.value)} />
-              </label>
-              <label style={s.label}>
-                Tu contraseña de superadmin
-                <input
-                  type="password"
-                  style={s.input}
-                  value={claveBorrar}
-                  onChange={(e) => setClaveBorrar(e.target.value)}
-                />
-              </label>
-              {errorBorrar && <p style={{ color: 'crimson', margin: 0 }}>{errorBorrar}</p>}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button style={s.botonSec} onClick={cancelarBorrar} disabled={eliminando}>
-                  Cancelar
+      {lista.map((r, i) => {
+        const enFoco = abierto === r.id || borrando === r.id
+        return (
+          <div key={r.id} className="entra" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
+            <div
+              className="tarjeta"
+              style={{
+                ...s.tarjeta,
+                opacity: r.activo ? 1 : 0.6,
+                borderColor: enFoco ? 'var(--lavanda-2)' : 'var(--linea)',
+                boxShadow: enFoco ? 'var(--sombra-alta)' : undefined,
+              }}
+            >
+              <div style={s.info}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <b style={{ fontSize: 18 }}>{r.nombre}</b>
+                  <span
+                    key={String(r.activo)}
+                    className="contador-pop"
+                    style={{
+                      ...s.estado,
+                      background: r.activo ? 'var(--menta)' : 'var(--lavanda)',
+                      color: r.activo ? 'var(--menta-tinta)' : 'var(--suave)',
+                    }}
+                  >
+                    {r.activo ? 'Activo' : 'Inactivo'}
+                  </span>
+                </div>
+                <small className="suave">
+                  Código <b style={{ color: 'var(--tinta)' }}>{r.slug}</b> · {r.moneda_codigo} ({r.moneda_simbolo}),{' '}
+                  {r.moneda_decimales} decimales
+                </small>
+                <label style={s.zona}>
+                  <small className="suave">Zona horaria</small>
+                  <select
+                    className="campo-chico"
+                    value={r.zona_horaria ?? 'America/Santiago'}
+                    onChange={(e) => cambiarZona(r, e.target.value)}
+                  >
+                    {ZONAS.map(([zona, nombre]) => (
+                      <option key={zona} value={zona}>
+                        {nombre}
+                      </option>
+                    ))}
+                    {!ZONAS.some(([zona]) => zona === r.zona_horaria) && r.zona_horaria && (
+                      <option value={r.zona_horaria}>{r.zona_horaria}</option>
+                    )}
+                  </select>
+                </label>
+              </div>
+              <div style={s.acciones}>
+                <button
+                  className={`btn ${abierto === r.id ? 'btn-morado' : 'btn-sec'}`}
+                  style={s.accion}
+                  aria-expanded={abierto === r.id}
+                  onClick={() => alternarAdmin(r)}
+                >
+                  {abierto === r.id ? 'Cerrar' : 'Administrar'}
                 </button>
-                <button style={s.botonPeligro} onClick={() => confirmarBorrar(r)} disabled={eliminando}>
-                  {eliminando ? 'Eliminando...' : 'Eliminar definitivamente'}
+                <button className={`btn ${r.activo ? 'btn-sec' : 'btn-principal'}`} style={s.accion} onClick={() => alternar(r)}>
+                  {r.activo ? 'Desactivar' : 'Activar'}
+                </button>
+                <button
+                  className="btn btn-peligro-suave"
+                  style={s.accion}
+                  aria-expanded={borrando === r.id}
+                  onClick={() => pedirBorrar(r)}
+                >
+                  Eliminar
                 </button>
               </div>
             </div>
-          )}
-        </div>
-      ))}
 
-      <div
-        style={{
-          maxHeight: hayPanelAbierto ? 0 : 800,
-          opacity: hayPanelAbierto ? 0 : 1,
-          overflow: 'hidden',
-          transition: 'max-height var(--dur) var(--ease), opacity var(--dur) var(--ease)',
-        }}
-        aria-hidden={hayPanelAbierto}
-      >
-      {mostrarCrear ? (
-        <form onSubmit={crear} className="aparece" style={s.form}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <b>Crear restaurante</b>
-            <button type="button" style={s.botonSec} onClick={() => setMostrarCrear(false)}>
+            <Desplegable abierto={abierto === r.id}>
+              <div style={s.panelAdmin}>
+                <Anclar block="start" />
+                <b style={s.panelAdminTitulo}>Administrando: {r.nombre}</b>
+                <Admin restaurante={r} />
+              </div>
+            </Desplegable>
+
+            <Desplegable abierto={borrando === r.id}>
+              <div style={s.confirmar}>
+                <Anclar block="center" />
+                <p style={{ margin: 0, fontWeight: 800, color: '#B3261E' }}>Vas a eliminar "{r.nombre}" para siempre</p>
+                <small>
+                  Se borran también su menú, mesas, personal (sus credenciales siguen sirviendo para otros
+                  restaurantes), pedidos y reportes. No se puede deshacer.
+                </small>
+                <label className="etiqueta">
+                  <span>
+                    Para confirmar, escribe el nombre exacto: <b>{r.nombre}</b>
+                  </span>
+                  <input className="campo" value={nombreBorrar} onChange={(e) => setNombreBorrar(e.target.value)} />
+                </label>
+                <label className="etiqueta">
+                  Tu contraseña de superadmin
+                  <input
+                    type="password"
+                    className="campo"
+                    value={claveBorrar}
+                    onChange={(e) => setClaveBorrar(e.target.value)}
+                  />
+                </label>
+                <Mensaje tipo="error">{errorBorrar}</Mensaje>
+                <div style={s.botonesFila}>
+                  <button className="btn btn-sec" style={{ flex: 1 }} onClick={cancelarBorrar} disabled={eliminando}>
+                    Cancelar
+                  </button>
+                  <button className="btn btn-peligro" style={{ flex: 2 }} onClick={() => confirmarBorrar(r)} disabled={eliminando}>
+                    {eliminando ? <span className="puntos">Eliminando</span> : 'Eliminar definitivamente'}
+                  </button>
+                </div>
+              </div>
+            </Desplegable>
+          </div>
+        )
+      })}
+
+      <Desplegable abierto={!hayPanelAbierto && !mostrarCrear}>
+        <button
+          className="btn btn-principal btn-grande btn-bloque"
+          onClick={() => {
+            sentir('toque')
+            setMostrarCrear(true)
+          }}
+        >
+          + Crear restaurante
+        </button>
+      </Desplegable>
+
+      <Desplegable abierto={!hayPanelAbierto && mostrarCrear}>
+        <form onSubmit={crear} style={s.form}>
+          <Anclar block="nearest" />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <b style={{ fontSize: 17 }}>Crear restaurante</b>
+            <button type="button" className="btn btn-chico btn-sec" onClick={() => setMostrarCrear(false)}>
               Cancelar
             </button>
           </div>
-          <label style={s.label}>
+          <label className="etiqueta">
             Nombre del restaurante
-            <input style={s.input} value={form.nombre} onChange={(e) => cambiarNombre(e.target.value)} />
+            <input className="campo" value={form.nombre} onChange={(e) => cambiarNombre(e.target.value)} />
           </label>
-          <label style={s.label}>
+          <label className="etiqueta">
             Código para el login del personal
             <input
-              style={s.input}
+              className="campo"
               value={form.slug}
+              autoCapitalize="none"
               onChange={(e) => {
                 setSlugManual(true)
                 setForm((f) => ({ ...f, slug: crearSlug(e.target.value) }))
               }}
             />
           </label>
-          <label style={s.label}>
+          <label className="etiqueta">
             Moneda sugerida
-            <select style={s.input} value={form.codigo} onChange={(e) => elegirMoneda(e.target.value)}>
+            <select className="campo" value={form.codigo} onChange={(e) => elegirMoneda(e.target.value)}>
               {MONEDAS.map((m) => (
                 <option key={m.codigo} value={m.codigo}>
                   {m.nombre} ({m.codigo})
                 </option>
               ))}
-              {!MONEDAS.some((m) => m.codigo === form.codigo) && (
-                <option value={form.codigo}>Otra ({form.codigo})</option>
-              )}
+              {!MONEDAS.some((m) => m.codigo === form.codigo) && <option value={form.codigo}>Otra ({form.codigo})</option>}
             </select>
           </label>
-          <div style={s.fila}>
-            <label style={s.label}>
+          <div style={s.tresColumnas}>
+            <label className="etiqueta">
               Código
               <input
-                style={s.input}
+                className="campo"
                 value={form.codigo}
                 onChange={(e) => setForm((f) => ({ ...f, codigo: e.target.value.toUpperCase() }))}
               />
             </label>
-            <label style={s.label}>
+            <label className="etiqueta">
               Símbolo
-              <input
-                style={s.input}
-                value={form.simbolo}
-                onChange={(e) => setForm((f) => ({ ...f, simbolo: e.target.value }))}
-              />
+              <input className="campo" value={form.simbolo} onChange={(e) => setForm((f) => ({ ...f, simbolo: e.target.value }))} />
             </label>
-            <label style={s.label}>
+            <label className="etiqueta">
               Decimales
               <select
-                style={s.input}
+                className="campo"
                 value={form.decimales}
                 onChange={(e) => setForm((f) => ({ ...f, decimales: e.target.value }))}
               >
@@ -333,9 +402,9 @@ export default function Superadmin() {
               </select>
             </label>
           </div>
-          <label style={s.label}>
+          <label className="etiqueta">
             Zona horaria (define cuándo empieza cada día)
-            <select style={s.input} value={form.zona} onChange={(e) => setForm((f) => ({ ...f, zona: e.target.value }))}>
+            <select className="campo" value={form.zona} onChange={(e) => setForm((f) => ({ ...f, zona: e.target.value }))}>
               {ZONAS.map(([zona, nombre]) => (
                 <option key={zona} value={zona}>
                   {nombre} ({zona})
@@ -343,32 +412,38 @@ export default function Superadmin() {
               ))}
             </select>
           </label>
-          <small>Así se verán los precios: {ejemplo}</small>
-          <button style={s.boton} disabled={guardando}>
-            {guardando ? 'Creando...' : 'Crear restaurante'}
+          <small className="suave">
+            Así se verán los precios: <b key={ejemplo} className="contador-pop" style={{ color: 'var(--tinta)' }}>{ejemplo}</b>
+          </small>
+          <button className="btn btn-principal btn-grande" disabled={guardando}>
+            {guardando ? <span className="puntos">Creando</span> : 'Crear restaurante'}
           </button>
         </form>
-      ) : (
-        <button style={{ ...s.boton, width: '100%' }} onClick={() => setMostrarCrear(true)}>
-          + Crear restaurante
-        </button>
-      )}
-      </div>
+      </Desplegable>
     </div>
   )
 }
 
 const s = {
-  pagina: { display: 'grid', gap: 8 },
-  form: { display: 'grid', gap: 12, background: '#f4f0f6', padding: 16, borderRadius: 12 },
-  label: { display: 'grid', gap: 4, fontSize: 14, fontWeight: 600, flex: 1 },
-  fila: { display: 'flex', gap: 10 },
-  input: { padding: 10, fontSize: 16, borderRadius: 8, border: '1px solid #bbb', width: '100%', boxSizing: 'border-box' },
-  boton: { padding: 12, fontSize: 15, fontWeight: 700, borderRadius: 8, border: 'none', background: '#F2A900', cursor: 'pointer' },
-  botonSec: { padding: 12, fontSize: 15, fontWeight: 600, borderRadius: 8, border: '1px solid #bbb', background: 'white', cursor: 'pointer' },
-  botonPeligro: { padding: 12, fontSize: 15, fontWeight: 700, borderRadius: 8, border: '1px solid #B3261E', background: '#B3261E', color: 'white', cursor: 'pointer' },
-  tarjeta: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, border: '1px solid #ddd', borderRadius: 12, padding: 14 },
-  confirmar: { display: 'grid', gap: 10, border: '2px solid #B3261E', borderRadius: 12, padding: 14, marginTop: -1, background: '#fff5f4' },
-  panelAdmin: { display: 'grid', gap: 12, marginTop: 14, padding: 16, borderRadius: 14, background: '#f4f0f6', border: '1px solid #d9cfe0' },
+  pagina: { display: 'grid', gap: 10, maxWidth: 860, margin: '0 auto' },
+  form: { display: 'grid', gap: 14, background: 'var(--lavanda)', border: '1px solid var(--lavanda-2)', padding: 16, borderRadius: 18 },
+  tresColumnas: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))', gap: 10 },
+  tarjeta: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 14,
+    borderRadius: 18,
+    transition: 'opacity 220ms var(--ease), box-shadow 220ms var(--ease), border-color 220ms var(--ease)',
+  },
+  info: { display: 'grid', gap: 6, flex: '1 1 240px', minWidth: 0 },
+  estado: { padding: '2px 10px', borderRadius: 99, fontSize: 12, fontWeight: 800 },
+  zona: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  acciones: { display: 'flex', flexWrap: 'wrap', gap: 8, flex: '1 1 300px', justifyContent: 'flex-end' },
+  accion: { flex: '1 1 0', minWidth: 96 },
+  botonesFila: { display: 'flex', gap: 8, flexWrap: 'wrap' },
+  confirmar: { display: 'grid', gap: 12, border: '1.5px solid #f0a9a3', borderRadius: 18, padding: 16, marginTop: 10, background: '#fff6f5' },
+  panelAdmin: { display: 'grid', gap: 12, marginTop: 10, padding: 14, borderRadius: 18, background: 'var(--lavanda)', border: '1px solid var(--lavanda-2)' },
   panelAdminTitulo: { fontSize: 14, color: '#4B1E4D' },
 }

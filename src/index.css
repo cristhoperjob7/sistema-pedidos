@@ -1,3 +1,6 @@
+/* Letra redondeada y amable (si no carga, se usa la del sistema). */
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+
 *,
 *::before,
 *::after {
@@ -5,61 +8,999 @@
 }
 
 :root {
-  /* Una sola curva y duración para que todo el sistema se sienta igual de "suave". */
+  /* ---- Colores de marca + pasteles ---- */
+  --morado: #4b1e4d;
+  --morado-osc: #2b102d;
+  --aji: #f2a900;
+  --aji-claro: #ffc23d;
+  --tinta: #241529;
+  --suave: #6f6477;
+  --linea: #ebe3f1;
+  --fondo: #f7f3fa;
+  --lavanda: #f1eaf6;
+  --lavanda-2: #e4d8ee;
+  --menta: #e3f4ea;
+  --menta-tinta: #2e7d4f;
+  --durazno: #fff3e2;
+  --rosa: #fdeceb;
+  --rosa-tinta: #b3261e;
+  --cielo: #e8f2fc;
+
+  --sombra: 0 1px 2px rgba(75, 30, 77, 0.05), 0 8px 24px -14px rgba(75, 30, 77, 0.22);
+  --sombra-alta: 0 2px 6px rgba(75, 30, 77, 0.08), 0 18px 40px -18px rgba(75, 30, 77, 0.35);
+
+  /* ---- Movimiento: una sola curva suave + un "resorte" con leve rebote (gelatina) ---- */
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --dur: 150ms;
+  --resorte: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur: 160ms;
+  --dur-panel: 320ms;
+
+  --radio: 14px;
+  --seguro-abajo: env(safe-area-inset-bottom, 0px);
+  --seguro-arriba: env(safe-area-inset-top, 0px);
 }
 
 html {
   -webkit-text-size-adjust: 100%;
-  /* Reserva el espacio de la barra de desplazamiento: la página no "salta"
-     cuando una pantalla es más alta que otra */
   scrollbar-gutter: stable;
+  -webkit-tap-highlight-color: transparent; /* sin el destello gris de iOS: el botón ya responde solo */
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background: #f5f2f7;
-  color: #241529;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  min-height: 100dvh;
+  color: var(--tinta);
+  font-family: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   font-size: 16px;
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
+  background:
+    radial-gradient(900px 520px at -10% -10%, #fff1df 0%, transparent 60%),
+    radial-gradient(900px 600px at 110% 110%, #ece2f6 0%, transparent 60%),
+    var(--fondo);
+  background-attachment: fixed;
 }
 
-/* Botones y campos usan la misma letra que el resto de la página */
+/* Nada se sale de la pantalla hacia el costado en el celular. */
+.app {
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: clip;
+}
+
 button,
 input,
 select,
 textarea {
   font: inherit;
+  color: inherit;
 }
 
+img,
+svg {
+  max-width: 100%;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+/* ============================================================================================
+   Botones: se hunden al tocarlos y vuelven con un pequeño rebote (como gelatina).
+   ============================================================================================ */
 button {
-  touch-action: manipulation; /* evita el zoom por doble toque en celulares */
-  transition: transform var(--dur) var(--ease), filter var(--dur) var(--ease), opacity var(--dur) var(--ease);
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: pointer;
+  transition:
+    transform 260ms var(--resorte),
+    background-color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease),
+    opacity var(--dur) var(--ease),
+    filter var(--dur) var(--ease);
 }
 
-/* Se "hunde" levemente al tocarlo: confirma que el toque registró antes de que pase nada más. */
 button:active:not(:disabled) {
-  transform: scale(0.96);
-  filter: brightness(0.96);
+  transform: scale(0.95);
+  transition-duration: 70ms;
+  transition-timing-function: var(--ease);
 }
 
 button:disabled {
   cursor: default;
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
-/* Que aparecer y desaparecer (tickets, paneles, tarjetas) se sienta igual de suave que los botones. */
-input,
-select,
-textarea {
-  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px; /* tamaño cómodo para el dedo */
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
 }
 
-/* Contorno visible al navegar con teclado */
+.btn-chico {
+  min-height: 38px;
+  padding: 7px 12px;
+  font-size: 14px;
+  border-radius: 10px;
+}
+
+.btn-grande {
+  min-height: 54px;
+  padding: 14px 20px;
+  font-size: 16px;
+  border-radius: 14px;
+}
+
+.btn-bloque {
+  width: 100%;
+}
+
+.btn-principal {
+  background: linear-gradient(180deg, var(--aji-claro) 0%, var(--aji) 100%);
+  color: #3a2400;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 6px 16px -8px rgba(242, 169, 0, 0.9);
+}
+
+.btn-principal:active:not(:disabled) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 6px -4px rgba(242, 169, 0, 0.9);
+}
+
+.btn-morado {
+  background: linear-gradient(180deg, #5c2a5f 0%, var(--morado) 100%);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 6px 16px -8px rgba(75, 30, 77, 0.8);
+}
+
+.btn-sec {
+  background: #fff;
+  border-color: var(--linea);
+  color: var(--morado);
+  box-shadow: 0 1px 2px rgba(75, 30, 77, 0.06);
+}
+
+.btn-suave {
+  background: var(--lavanda);
+  color: var(--morado);
+}
+
+.btn-peligro {
+  background: linear-gradient(180deg, #c8382f 0%, var(--rosa-tinta) 100%);
+  color: #fff;
+  box-shadow: 0 6px 16px -8px rgba(179, 38, 30, 0.8);
+}
+
+/* Primer paso de algo destructivo: tranquilo, rosado. La confirmación sí es roja. */
+.btn-peligro-suave {
+  background: var(--rosa);
+  color: var(--rosa-tinta);
+}
+
+.btn-fantasma {
+  background: transparent;
+  color: var(--morado);
+  min-height: 40px;
+  padding: 6px 8px;
+}
+
+@media (hover: hover) {
+  .btn-principal:hover:not(:disabled) {
+    filter: brightness(1.04);
+  }
+  .btn-sec:hover:not(:disabled) {
+    border-color: var(--lavanda-2);
+    background: #fdfbfe;
+  }
+  .btn-suave:hover:not(:disabled) {
+    background: var(--lavanda-2);
+  }
+}
+
+/* Botón redondo para + y − */
+.btn-redondo {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+/* Puntos que "respiran" mientras algo se está enviando */
+.puntos::after {
+  content: '';
+  display: inline-block;
+  width: 1.2em;
+  text-align: left;
+  animation: puntos 900ms steps(4) infinite;
+}
+@keyframes puntos {
+  0% {
+    content: '';
+  }
+  25% {
+    content: '.';
+  }
+  50% {
+    content: '..';
+  }
+  75% {
+    content: '...';
+  }
+}
+
+/* ============================================================================================
+   Campos de texto
+   ============================================================================================ */
+.campo,
+.campo-chico {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  font-size: 16px; /* 16px evita el zoom automático del iPhone */
+  border-radius: 12px;
+  border: 1px solid var(--lavanda-2);
+  background: #fff;
+  transition:
+    border-color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease),
+    background-color var(--dur) var(--ease);
+}
+
+.campo-chico {
+  width: auto;
+  min-height: 40px;
+  padding: 7px 10px;
+  font-size: 15px;
+  border-radius: 10px;
+}
+
+.campo:focus,
+.campo-chico:focus {
+  outline: none;
+  border-color: #b79bcb;
+  box-shadow: 0 0 0 4px rgba(155, 115, 185, 0.18);
+}
+
+/* Al guardar en el lugar: borde menta un instante. Si no se pudo: tiembla en rosado. */
+.campo.guardado,
+.campo-chico.guardado {
+  animation: guardado 900ms var(--ease);
+}
+@keyframes guardado {
+  0% {
+    border-color: #6cc497;
+    box-shadow: 0 0 0 4px rgba(108, 196, 151, 0.28);
+    background-color: #f3fbf6;
+  }
+  100% {
+    border-color: var(--lavanda-2);
+    box-shadow: 0 0 0 0 rgba(108, 196, 151, 0);
+    background-color: #fff;
+  }
+}
+.campo.invalido,
+.campo-chico.invalido {
+  animation: tiembla 360ms var(--ease);
+  border-color: #e7a7a2;
+}
+
+.etiqueta {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  min-width: 0;
+}
+
+/* Con un campo con guardado: un ✓ que aparece y se va */
+.campo-envoltura {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+.campo-check {
+  position: absolute;
+  right: 10px;
+  color: var(--menta-tinta);
+  font-weight: 900;
+  pointer-events: none;
+  animation: check 900ms var(--resorte) forwards;
+}
+@keyframes check {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+/* ============================================================================================
+   Tarjetas y superficies
+   ============================================================================================ */
+.tarjeta {
+  background: #fff;
+  border: 1px solid var(--linea);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra);
+  padding: 14px;
+}
+
+.superficie-lavanda {
+  background: var(--lavanda);
+  border: 1px solid var(--lavanda-2);
+  border-radius: var(--radio);
+  padding: 14px;
+}
+
+.suave {
+  color: var(--suave);
+}
+
+.fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.nota {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--lavanda);
+  color: #5b4d63;
+  font-size: 14px;
+}
+
+/* ============================================================================================
+   Entradas y salidas
+   ============================================================================================ */
+@keyframes aparece {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.aparece {
+  animation: aparece 260ms var(--ease) backwards;
+}
+
+/* Solo fundido (sin moverse): para contenedores con elementos fijos dentro */
+@keyframes funde {
+  from {
+    opacity: 0;
+  }
+}
+.funde {
+  animation: funde 240ms var(--ease);
+}
+
+/* Elementos nuevos de una lista: llegan con un rebote de gelatina */
+@keyframes entra {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.94);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.015);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+.entra {
+  animation: entra 420ms var(--ease) backwards;
+}
+
+/* Cambio de pantalla hacia adelante (entrar a una mesa) */
+@keyframes entra-derecha {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.entra-derecha {
+  animation: entra-derecha 300ms var(--ease) backwards;
+}
+@keyframes entra-izquierda {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.entra-izquierda {
+  animation: entra-izquierda 300ms var(--ease) backwards;
+}
+
+/* Barra inferior que sube desde el borde de la pantalla */
+@keyframes sube {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+.sube {
+  animation: sube 380ms var(--ease) backwards;
+}
+
+/* Aparece "inflándose" (para el − y el número al agregar el primer producto) */
+@keyframes infla {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.infla {
+  animation: infla 320ms var(--ease) backwards;
+}
+
+/* Rebote corto cuando cambia un número (se usa con key={valor}) */
+@keyframes pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.28);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.contador-pop {
+  display: inline-block;
+  animation: pop 260ms var(--resorte);
+}
+
+/* Destello pastel: "esto acaba de cambiar" */
+@keyframes brilla {
+  0% {
+    background-color: #fff2c9;
+    box-shadow: 0 0 0 3px rgba(255, 194, 61, 0.45);
+  }
+  100% {
+    background-color: #fff;
+    box-shadow: 0 0 0 0 rgba(255, 194, 61, 0);
+  }
+}
+.brilla {
+  animation: brilla 1400ms var(--ease);
+}
+
+/* Al combinarse con la entrada, se suman las dos animaciones (no se pisan) */
+.entra.brilla {
+  animation:
+    entra 420ms var(--ease) backwards,
+    brilla 1400ms var(--ease);
+}
+
+/* Cocina: anillo que late 3 veces cuando llega un ticket nuevo */
+@keyframes anillo {
+  0% {
+    box-shadow: 0 0 0 0 rgba(242, 169, 0, 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 16px rgba(242, 169, 0, 0);
+  }
+}
+.ticket-nuevo,
+.entra.ticket-nuevo {
+  animation:
+    entra 420ms var(--ease) backwards,
+    anillo 1.3s var(--ease) 380ms 3;
+}
+
+/* Cocina: un ticket atrasado "respira" en rosado, sin parpadear como alarma */
+@keyframes urgente {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(233, 138, 131, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(233, 138, 131, 0.28);
+  }
+}
+.ticket-urgente,
+.entra.ticket-urgente {
+  animation:
+    entra 420ms var(--ease) backwards,
+    urgente 2.4s ease-in-out infinite;
+}
+
+@keyframes tiembla {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(5px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(2px);
+  }
+}
+
+/* Una vuelta con rebote (ícono de actualizar) */
+@keyframes gira {
+  from {
+    transform: rotate(0);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Flota suavemente (iconos de estados vacíos) */
+@keyframes flota {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* Respira: invita a tocar sin gritar */
+@keyframes respira {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(242, 169, 0, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(242, 169, 0, 0);
+  }
+}
+.respira {
+  animation: respira 2s var(--ease) infinite;
+}
+
+/* Desplegable: crece desde altura 0 hasta su tamaño real, y al revés al cerrar */
+.desplegable {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    grid-template-rows var(--dur-panel) var(--ease),
+    opacity var(--dur-panel) var(--ease),
+    transform var(--dur-panel) var(--ease);
+}
+.desplegable.abierto {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transform: none;
+}
+.desplegable-in {
+  min-height: 0;
+  overflow: hidden;
+}
+/* Ya abierto del todo: que no se corten sombras ni el contorno de foco */
+.desplegable.suelto > .desplegable-in {
+  overflow: visible;
+}
+
+/* ============================================================================================
+   Mensajes en línea
+   ============================================================================================ */
+.msj {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  animation: aparece 260ms var(--ease) backwards;
+}
+.msj-ok {
+  background: var(--menta);
+  color: var(--menta-tinta);
+}
+.msj-error {
+  background: var(--rosa);
+  color: var(--rosa-tinta);
+  animation:
+    aparece 200ms var(--ease) backwards,
+    tiembla 380ms var(--ease) 120ms;
+}
+
+/* ============================================================================================
+   Avisos flotantes (arriba, como una isla)
+   ============================================================================================ */
+.avisos {
+  position: fixed;
+  z-index: 1000;
+  top: calc(var(--seguro-arriba) + 10px);
+  left: 0;
+  right: 0;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  pointer-events: none;
+}
+.aviso {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(440px, 100%);
+  padding: 11px 18px 11px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  backdrop-filter: blur(14px) saturate(1.4);
+  box-shadow: var(--sombra-alta);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--tinta);
+  text-align: left;
+  animation: aviso-entra 520ms var(--resorte) backwards;
+}
+.aviso.saliendo {
+  animation: aviso-sale 300ms var(--ease) both;
+}
+.aviso-icono {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--menta);
+  color: var(--menta-tinta);
+  font-size: 14px;
+}
+.aviso-error .aviso-icono,
+.aviso-borrar .aviso-icono {
+  background: var(--rosa);
+  color: var(--rosa-tinta);
+}
+.aviso-cocina .aviso-icono,
+.aviso-cobro .aviso-icono {
+  background: var(--durazno);
+}
+.aviso-info .aviso-icono {
+  background: var(--lavanda);
+  color: var(--morado);
+}
+@keyframes aviso-entra {
+  from {
+    opacity: 0;
+    transform: translateY(-24px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes aviso-sale {
+  to {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.96);
+  }
+}
+
+/* ============================================================================================
+   Confeti
+   ============================================================================================ */
+.confeti-capa {
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  pointer-events: none;
+  overflow: hidden;
+}
+.confeti-capa i {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  margin: -4px 0 0 -4px;
+  border-radius: 3px;
+  animation: confeti 950ms cubic-bezier(0.16, 0.84, 0.44, 1) both;
+}
+@keyframes confeti {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0) scale(0.6);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), calc(var(--dy) + 90px)) rotate(var(--giro)) scale(1);
+  }
+}
+
+/* ============================================================================================
+   Esqueleto de carga
+   ============================================================================================ */
+.esqueleto {
+  display: grid;
+  gap: 10px;
+}
+.esqueleto-bloque {
+  border-radius: var(--radio);
+  background: linear-gradient(90deg, #efe8f4 0%, #f8f4fb 40%, #efe8f4 80%);
+  background-size: 300% 100%;
+  animation: brillo-carga 1.6s var(--ease) infinite;
+}
+@keyframes brillo-carga {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+/* ============================================================================================
+   Estado vacío amable
+   ============================================================================================ */
+.vacio {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--suave);
+  border: 1.5px dashed var(--lavanda-2);
+  border-radius: var(--radio);
+  background: rgba(255, 255, 255, 0.55);
+}
+.vacio-icono {
+  font-size: 34px;
+  animation: flota 3s ease-in-out infinite;
+}
+.vacio b {
+  color: var(--tinta);
+}
+
+/* ============================================================================================
+   Interruptor (switch)
+   ============================================================================================ */
+.interruptor {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.interruptor.deshabilitado {
+  opacity: 0.5;
+  cursor: default;
+}
+.interruptor input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.interruptor-pista {
+  position: relative;
+  flex: none;
+  width: 50px;
+  height: 30px;
+  border-radius: 99px;
+  background: var(--lavanda-2);
+  transition: background-color 220ms var(--ease);
+}
+.interruptor-bola {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(36, 21, 41, 0.22);
+  transition:
+    transform 380ms var(--resorte),
+    width 160ms var(--ease);
+}
+.interruptor input:checked + .interruptor-pista {
+  background: #6cc497;
+}
+.interruptor input:checked + .interruptor-pista .interruptor-bola {
+  transform: translateX(20px);
+}
+/* Al presionar, la bola se estira un poquito (como en iOS) */
+.interruptor:active .interruptor-bola {
+  width: 28px;
+}
+.interruptor:active input:checked + .interruptor-pista .interruptor-bola {
+  transform: translateX(16px);
+}
+.interruptor input:focus-visible + .interruptor-pista {
+  outline: 3px solid rgba(242, 169, 0, 0.85);
+  outline-offset: 2px;
+}
+
+/* ============================================================================================
+   Selector segmentado con pastilla deslizante
+   ============================================================================================ */
+.segmento {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--lavanda);
+  isolation: isolate;
+}
+.segmento::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc((100% - 8px) / var(--n));
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 2px 8px -2px rgba(75, 30, 77, 0.25);
+  transform: translateX(calc(var(--pos) * 100%));
+  transition: transform 420ms var(--resorte);
+}
+.segmento.oscuro::before {
+  background: linear-gradient(180deg, #5c2a5f 0%, var(--morado) 100%);
+}
+.segmento button {
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--suave);
+  font-size: 15px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.segmento button[aria-pressed='true'] {
+  color: var(--morado);
+}
+.segmento.oscuro button[aria-pressed='true'] {
+  color: #fff;
+}
+.segmento button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* ============================================================================================
+   Chips (categorías del menú)
+   ============================================================================================ */
+.chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 6px 2px 12px;
+  margin: 0 -2px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.chips::-webkit-scrollbar {
+  display: none;
+}
+.chip {
+  flex: none;
+  scroll-snap-align: start;
+  min-height: 42px;
+  padding: 9px 16px;
+  border-radius: 99px;
+  border: 1px solid var(--lavanda-2);
+  background: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--suave);
+}
+.chip[aria-pressed='true'] {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--aji-claro) 0%, var(--aji) 100%);
+  color: #3a2400;
+  box-shadow: 0 6px 14px -8px rgba(242, 169, 0, 0.9);
+}
+
+/* ============================================================================================
+   Números
+   ============================================================================================ */
+.numero {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Barras de los reportes: crecen desde la izquierda al aparecer */
+@keyframes crece {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.barra-crece {
+  transform-origin: left center;
+  animation: crece 700ms var(--ease) backwards;
+}
+
+/* ============================================================================================
+   Accesibilidad
+   ============================================================================================ */
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
@@ -68,49 +1009,13 @@ a:focus-visible {
   outline-offset: 2px;
 }
 
-h1,
-h2,
-h3,
-h4 {
-  line-height: 1.2;
-}
-
-/* Rebote corto: confirma que un número cambió (ej: contador de cantidad). Se usa con key={valor}
-   para que React vuelva a montar el elemento y la animación se repita en cada cambio. */
-@keyframes pop {
-  0% {
-    transform: scale(1);
-  }
-  40% {
-    transform: scale(1.3);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-.contador-pop {
-  display: inline-block;
-  animation: pop 220ms var(--ease);
-}
-
-/* Entrada suave para paneles y tarjetas que aparecen de golpe (tickets nuevos, paneles de confirmación). */
-@keyframes aparece {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.aparece {
-  animation: aparece var(--dur) var(--ease);
-}
-
 @media (prefers-reduced-motion: reduce) {
-  * {
+  *,
+  *::before,
+  *::after {
     scroll-behavior: auto !important;
-    transition: none !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
   }
 }

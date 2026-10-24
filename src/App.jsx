@@ -5,6 +5,8 @@ import Admin from './Admin'
 import Mesera from './Mesera'
 import Cocina from './Cocina'
 import Login, { NuevaClave, MARCA } from './Login'
+import { Avisos, Cargando } from './ui'
+import { cambiarSonidos, sentir, sonidosEncendidos } from './feedback'
 
 // Lee lo que Supabase deja en la dirección al volver del correo de recuperación.
 function leerEnlace() {
@@ -42,9 +44,15 @@ export default function App() {
     return () => sub.subscription.unsubscribe()
   }, [enlace.error])
 
-  if (cargando) return <p style={estilos.caja}>Cargando...</p>
-  if (recuperando && sesion) {
-    return (
+  let contenido
+  if (cargando) {
+    contenido = (
+      <div style={estilos.caja}>
+        <Cargando filas={3} />
+      </div>
+    )
+  } else if (recuperando && sesion) {
+    contenido = (
       <NuevaClave
         onListo={() => {
           limpiarDireccion()
@@ -52,15 +60,27 @@ export default function App() {
         }}
       />
     )
+  } else if (!sesion) {
+    contenido = <Login avisoInicial={enlace.error} />
+  } else {
+    contenido = <Panel sesion={sesion} />
   }
-  if (!sesion) return <Login avisoInicial={enlace.error} />
-  return <Panel sesion={sesion} />
+
+  return (
+    <div className="app">
+      {contenido}
+      <Avisos />
+    </div>
+  )
 }
+
+const ROL_TEXTO = { admin: 'Administración', mesera: 'Salón', cocina: 'Cocina' }
 
 function Panel({ sesion }) {
   const [perfil, setPerfil] = useState(null)
   const [membresias, setMembresias] = useState([])
   const [error, setError] = useState('')
+  const [sonidos, setSonidos] = useState(sonidosEncendidos)
 
   useEffect(() => {
     async function cargar() {
@@ -83,56 +103,132 @@ function Panel({ sesion }) {
   }, [sesion])
 
   const miembro = membresias[0]
+  const subtitulo = perfil?.es_superadmin
+    ? 'Superadmin'
+    : miembro
+      ? `${miembro.restaurantes.nombre} · ${ROL_TEXTO[miembro.rol] ?? ''}`
+      : ''
+
+  function alternarSonidos() {
+    const nuevo = !sonidos
+    cambiarSonidos(nuevo)
+    setSonidos(nuevo)
+    sentir('toque', nuevo ? 'tic' : undefined)
+  }
 
   return (
     <div>
       <header style={estilos.header}>
-        <div>
-          <b>{MARCA}</b> · {perfil ? perfil.nombre : '...'}
-          {perfil?.es_superadmin ? ' (Superadmin)' : ''}
-          {miembro ? ` · ${miembro.restaurantes.nombre}` : ''}
+        <div style={estilos.headerInterior}>
+          <span style={estilos.logo} aria-hidden="true">
+            🍽️
+          </span>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <b style={estilos.marca}>{perfil ? perfil.nombre : MARCA}</b>
+            <small style={estilos.sub}>{perfil ? subtitulo || MARCA : ' '}</small>
+          </div>
+          <button
+            className="btn btn-chico"
+            style={estilos.icono}
+            onClick={alternarSonidos}
+            aria-label={sonidos ? 'Silenciar sonidos de la app' : 'Activar sonidos de la app'}
+            title={sonidos ? 'Sonidos activados' : 'Sonidos silenciados'}
+          >
+            <span key={String(sonidos)} className="contador-pop">
+              {sonidos ? '🔊' : '🔇'}
+            </span>
+          </button>
+          <button
+            className="btn btn-chico"
+            style={estilos.salir}
+            onClick={() => {
+              sentir('toque')
+              supabase.auth.signOut()
+            }}
+          >
+            Salir
+          </button>
         </div>
-        <button style={estilos.botonSec} onClick={() => supabase.auth.signOut()}>
-          Cerrar sesión
-        </button>
       </header>
       <main style={estilos.main}>
-        {error && <p style={{ color: 'crimson' }}>Error: {error}</p>}
+        {error && <p className="msj msj-error">Error: {error}</p>}
 
-        {perfil?.es_superadmin && <Superadmin />}
+        {!perfil && !error && <Cargando filas={4} alto={72} />}
 
-        {perfil && !perfil.es_superadmin && !miembro && (
-          <p>Tu usuario no tiene un restaurante activo asignado.</p>
+        {perfil?.es_superadmin && (
+          <div className="aparece">
+            <Superadmin />
+          </div>
         )}
 
-        {miembro && miembro.rol === 'admin' && <Admin restaurante={miembro.restaurantes} conPedidos />}
+        {perfil && !perfil.es_superadmin && !miembro && (
+          <div className="vacio aparece">
+            <span className="vacio-icono">🔑</span>
+            <b>Tu usuario no tiene un restaurante activo asignado.</b>
+            <span>Pídele al administrador que revise tu acceso.</span>
+          </div>
+        )}
 
-        {miembro && miembro.rol === 'mesera' && <Mesera restaurante={miembro.restaurantes} />}
-
-        {miembro && miembro.rol === 'cocina' && <Cocina restaurante={miembro.restaurantes} />}
+        {miembro && (
+          <div className="aparece">
+            {miembro.rol === 'admin' && <Admin restaurante={miembro.restaurantes} conPedidos />}
+            {miembro.rol === 'mesera' && <Mesera restaurante={miembro.restaurantes} />}
+            {miembro.rol === 'cocina' && <Cocina restaurante={miembro.restaurantes} />}
+          </div>
+        )}
       </main>
     </div>
   )
 }
 
 const estilos = {
-  caja: { maxWidth: 420, margin: '40px auto', padding: 20, display: 'grid', gap: 12 },
-  botonSec: {
-    padding: '8px 12px',
-    fontSize: 14,
-    borderRadius: 8,
-    border: 'none',
-    background: 'rgba(255,255,255,.2)',
-    color: 'white',
-    cursor: 'pointer',
-  },
+  caja: { maxWidth: 420, margin: '40px auto', padding: 20 },
   header: {
-    background: '#4B1E4D',
+    position: 'sticky',
+    top: 0,
+    zIndex: 50,
+    background: 'linear-gradient(135deg, rgba(92,42,95,.96) 0%, rgba(75,30,77,.96) 100%)',
+    WebkitBackdropFilter: 'blur(12px)',
+    backdropFilter: 'blur(12px)',
     color: 'white',
-    padding: '14px 18px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    paddingTop: 'var(--seguro-arriba)',
+    boxShadow: '0 6px 20px -12px rgba(43,16,45,.6)',
   },
-  main: { maxWidth: 720, margin: '0 auto', padding: 16 },
+  headerInterior: {
+    maxWidth: 1100,
+    margin: '0 auto',
+    padding: '10px 16px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+  },
+  logo: {
+    flex: 'none',
+    display: 'grid',
+    placeItems: 'center',
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    background: 'linear-gradient(180deg, #FFC23D, #F2A900)',
+    fontSize: 19,
+  },
+  marca: {
+    display: 'block',
+    fontSize: 16,
+    lineHeight: 1.2,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+  sub: {
+    display: 'block',
+    fontSize: 13,
+    opacity: 0.8,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+  icono: { background: 'rgba(255,255,255,.14)', color: 'white', minWidth: 40, padding: '6px 8px', flex: 'none' },
+  salir: { background: 'rgba(255,255,255,.14)', color: 'white', flex: 'none' },
+  main: { maxWidth: 1100, margin: '0 auto', padding: '16px 16px 32px' },
 }

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from './supabase'
+import { audioCtx, sentir, sonar } from './feedback'
+import { Cargando, Desplegable, Mensaje } from './ui'
 
 const TIPOS_ANULACION = ['anulacion', 'anulacion_total']
 
@@ -11,9 +13,9 @@ export default function Cocina({ restaurante }) {
   const [error, setError] = useState('')
   const [sonidoListo, setSonidoListo] = useState(false)
   const [ahora, setAhora] = useState(Date.now())
-  const [saliendo, setSaliendo] = useState(() => new Set()) // ids que se están desvaneciendo antes de quitarse
+  const [saliendo, setSaliendo] = useState(() => new Map()) // id -> 'listo' | 'visto' mientras se despide
+  const [recientes, setRecientes] = useState(() => new Set()) // tickets recién llegados (anillo de aviso)
   const vistos = useRef(null) // tickets ya conocidos; null en la primera carga para no sonar
-  const audio = useRef(null)
   const ajustesRef = useRef(ajustes)
   const temporizador = useRef(null)
 
@@ -22,12 +24,11 @@ export default function Cocina({ restaurante }) {
   }, [ajustes])
 
   // Timbre de dos notas para pedidos nuevos; aviso grave de tres tonos para anulaciones.
-  function sonar(tipo) {
+  // Es más fuerte que los sonidos de la interfaz: tiene que oírse en una cocina con ruido.
+  function timbre(tipo) {
+    const ctx = audioCtx()
+    if (!ctx) return
     try {
-      const Ctx = window.AudioContext || window.webkitAudioContext
-      audio.current = audio.current || new Ctx()
-      const ctx = audio.current
-      if (ctx.state === 'suspended') ctx.resume()
       const notas = tipo === 'anulacion' ? [[330, 0], [262, 0.24], [330, 0.48]] : [[784, 0], [988, 0.18]]
       notas.forEach(([frecuencia, retraso]) => {
         const osc = ctx.createOscillator()
@@ -43,13 +44,20 @@ export default function Cocina({ restaurante }) {
         osc.start(inicio)
         osc.stop(inicio + 0.32)
       })
-    } catch (_e) {
+    } catch {
       // sin audio disponible: la pantalla sigue funcionando
     }
   }
 
   function activarSonido() {
-    sonar('nuevo')
+    // En iPhone/iPad (Safari 17+) esto hace que el aviso suene aunque el equipo esté en silencio.
+    try {
+      if (navigator.audioSession) navigator.audioSession.type = 'playback'
+    } catch {
+      // no soportado
+    }
+    sentir('exito')
+    timbre('nuevo')
     setSonidoListo(true)
   }
 
@@ -87,8 +95,21 @@ export default function Cocina({ restaurante }) {
 
     if (vistos.current) {
       const nuevos = visibles.filter((x) => !vistos.current.has(x.id))
-      if (nuevos.length && ajustesRef.current.sonido_activo) {
-        sonar(nuevos.some((x) => TIPOS_ANULACION.includes(x.tipo)) ? 'anulacion' : 'nuevo')
+      if (nuevos.length) {
+        if (ajustesRef.current.sonido_activo) {
+          timbre(nuevos.some((x) => TIPOS_ANULACION.includes(x.tipo)) ? 'anulacion' : 'nuevo')
+        }
+        const ids = nuevos.map((x) => x.id)
+        setRecientes((r) => new Set([...r, ...ids]))
+        setTimeout(
+          () =>
+            setRecientes((r) => {
+              const n = new Set(r)
+              ids.forEach((id) => n.delete(id))
+              return n
+            }),
+          6000
+        )
       }
     }
     vistos.current = new Set(visibles.map((x) => x.id))
@@ -119,16 +140,18 @@ export default function Cocina({ restaurante }) {
   }, [cargar, restaurante.id])
 
   async function resolver(ticket, estado) {
-    // Se desvanece suave y recién al terminar la animación se quita de la lista.
-    setSaliendo((s) => new Set(s).add(ticket.id))
+    sentir('toque', estado === 'listo' ? 'exito' : 'tic')
+    // Se pinta de menta con un ✓, se encoge suave y recién al terminar se quita de la lista.
+    setSaliendo((s) => new Map(s).set(ticket.id, estado))
+    if (estado === 'listo') setListos((n) => n + 1)
     setTimeout(() => {
       setTickets((prev) => prev.filter((x) => x.id !== ticket.id))
       setSaliendo((s) => {
-        const n = new Set(s)
+        const n = new Map(s)
         n.delete(ticket.id)
         return n
       })
-    }, 200)
+    }, 420)
     const { error } = await supabase
       .from('envios_cocina')
       .update({ estado, resuelto_en: new Date().toISOString() })
@@ -143,26 +166,45 @@ export default function Cocina({ restaurante }) {
     return [...g.entries()]
   }
 
-  if (!tickets) return <p>{error ? `Error: ${error}` : 'Cargando...'}</p>
+  if (!tickets) {
+    return error ? <Mensaje tipo="error">{error}</Mensaje> : <Cargando filas={3} alto={140} />
+  }
 
   return (
     <div>
       <div style={s.cabecera}>
         <div>
           <h2 style={{ margin: 0 }}>Cocina</h2>
-          <small style={{ color: '#6f6477' }}>
-            {tickets.length} pendientes · {listos} listos hoy
-          </small>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+            <span style={{ ...s.pastilla, background: 'var(--durazno)', color: '#8a4b00' }}>
+              <b key={tickets.length} className="contador-pop">
+                {tickets.length}
+              </b>{' '}
+              pendiente{tickets.length === 1 ? '' : 's'}
+            </span>
+            <span style={{ ...s.pastilla, background: 'var(--menta)', color: 'var(--menta-tinta)' }}>
+              <b key={listos} className="contador-pop">
+                {listos}
+              </b>{' '}
+              listo{listos === 1 ? '' : 's'} hoy
+            </span>
+          </div>
         </div>
-        {ajustes.sonido_activo && !sonidoListo && (
-          <button style={s.activar} onClick={activarSonido}>
+        <Desplegable abierto={ajustes.sonido_activo && !sonidoListo}>
+          <button className="btn btn-principal respira" onClick={activarSonido}>
             🔔 Activar sonido
           </button>
-        )}
+        </Desplegable>
       </div>
 
-      {error && <p style={{ color: 'crimson' }}>{error}</p>}
-      {tickets.length === 0 && <p style={{ color: '#6f6477' }}>No hay pedidos pendientes.</p>}
+      <Mensaje tipo="error">{error}</Mensaje>
+      {tickets.length === 0 && (
+        <div className="vacio aparece">
+          <span className="vacio-icono">✨</span>
+          <b>Todo al día</b>
+          <span>No hay pedidos pendientes. Los nuevos aparecen aquí solos.</span>
+        </div>
+      )}
 
       <div style={s.grid}>
         {tickets.map((t) => {
@@ -171,15 +213,16 @@ export default function Cocina({ restaurante }) {
           const mesa = `Mesa ${t.pedidos?.mesas?.numero ?? t.pedidos?.mesa_numero ?? '?'}`
           const llevar = t.modalidad === 'llevar'
           const esAnulacion = TIPOS_ANULACION.includes(t.tipo)
-
-          const estiloSalida = saliendo.has(t.id) ? s.ticketSaliendo : null
+          const salida = saliendo.get(t.id)
+          const estiloSalida = salida ? (salida === 'listo' ? s.ticketListo : s.ticketVisto) : null
+          const clase = `entra${recientes.has(t.id) ? ' ticket-nuevo' : ''}`
 
           if (esAnulacion) {
             return (
               <div
                 key={t.id}
-                className="aparece"
-                style={{ ...s.ticket, borderColor: '#B3261E', background: '#fdf0ef', ...estiloSalida }}
+                className={clase}
+                style={{ ...s.ticket, borderColor: '#f0a9a3', background: '#fff6f5', ...estiloSalida }}
               >
                 <div style={s.titulo}>
                   <b>
@@ -187,33 +230,50 @@ export default function Cocina({ restaurante }) {
                   </b>
                   <span style={{ color: '#B3261E' }}>{min} min</span>
                 </div>
-                <p style={{ margin: 0, fontWeight: 800, color: '#B3261E', fontSize: 18 }}>
+                <p style={{ margin: 0, fontWeight: 900, color: '#B3261E', fontSize: 18 }}>
                   {t.tipo === 'anulacion_total' ? 'ORDEN COMPLETA ANULADA' : 'ANULADO'}
                 </p>
                 {juntar(t.anulaciones).map(([nombre, cantidad]) => (
-                  <p key={nombre} style={s.linea}>
+                  <p key={nombre} style={{ ...s.linea, textDecoration: 'line-through', textDecorationColor: '#e7a7a2' }}>
                     <b>{cantidad}×</b> {nombre}
                   </p>
                 ))}
-                <button style={s.enterado} onClick={() => resolver(t, 'visto')}>
+                <button className="btn btn-sec btn-grande" style={s.boton} disabled={!!salida} onClick={() => resolver(t, 'visto')}>
                   Enterado
                 </button>
               </div>
             )
           }
 
-          const borde =
-            min >= ajustes.alerta_roja_min ? '#B3261E' : min >= ajustes.alerta_amarilla_min ? '#F2A900' : '#e2dce8'
+          const nivel = min >= ajustes.alerta_roja_min ? 'rojo' : min >= ajustes.alerta_amarilla_min ? 'amarillo' : 'ok'
+          const borde = nivel === 'rojo' ? '#e98a83' : nivel === 'amarillo' ? '#f6c95b' : 'var(--linea)'
           return (
-            <div key={t.id} className="aparece" style={{ ...s.ticket, borderColor: borde, ...estiloSalida }}>
+            <div
+              key={t.id}
+              className={`${clase}${nivel === 'rojo' && !salida ? ' ticket-urgente' : ''}`}
+              style={{ ...s.ticket, borderColor: borde, ...estiloSalida }}
+            >
+              {salida === 'listo' && (
+                <span className="infla" style={s.check} aria-hidden="true">
+                  ✓
+                </span>
+              )}
               <div style={s.titulo}>
                 <b>
                   {mesa} ·{' '}
                   <span style={llevar ? s.badgeLlevar : s.badgeServir}>{llevar ? 'Para llevar' : 'Servir'}</span>
                 </b>
-                <span style={{ color: min >= ajustes.alerta_roja_min ? '#B3261E' : '#6f6477' }}>{min} min</span>
+                <span
+                  style={{
+                    ...s.minutos,
+                    background: nivel === 'rojo' ? 'var(--rosa)' : nivel === 'amarillo' ? 'var(--durazno)' : 'var(--lavanda)',
+                    color: nivel === 'rojo' ? '#B3261E' : nivel === 'amarillo' ? '#8a4b00' : 'var(--suave)',
+                  }}
+                >
+                  {min} min
+                </span>
               </div>
-              <small style={{ color: '#6f6477', fontSize: 15 }}>
+              <small className="suave" style={{ fontSize: 15 }}>
                 Pedido {numero}
                 {t.tipo === 'adicion' ? ' · adición' : ''}
               </small>
@@ -222,7 +282,7 @@ export default function Cocina({ restaurante }) {
                   <b>{cantidad}×</b> {nombre}
                 </p>
               ))}
-              <button style={s.listo} onClick={() => resolver(t, 'listo')}>
+              <button className="btn btn-principal btn-grande" style={s.boton} disabled={!!salida} onClick={() => resolver(t, 'listo')}>
                 Listo
               </button>
             </div>
@@ -230,7 +290,7 @@ export default function Cocina({ restaurante }) {
         })}
       </div>
 
-      <p style={s.nota}>
+      <p className="nota" style={{ marginTop: 16 }}>
         Los pedidos llegan solos. Borde amarillo: más de {ajustes.alerta_amarilla_min} min. Rojo: más de{' '}
         {ajustes.alerta_roja_min} min.
       </p>
@@ -239,25 +299,38 @@ export default function Cocina({ restaurante }) {
 }
 
 const s = {
-  cabecera: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 12 },
-  activar: { padding: '12px 16px', borderRadius: 12, border: 'none', background: '#F2A900', fontSize: 15, fontWeight: 800, cursor: 'pointer' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 },
+  cabecera: { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 14 },
+  pastilla: { padding: '4px 12px', borderRadius: 99, fontSize: 14, fontWeight: 700 },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(260px, 100%), 1fr))', gap: 14 },
   ticket: {
+    position: 'relative',
     display: 'flex',
     flexDirection: 'column',
     gap: 8,
     background: 'white',
     border: '3px solid',
-    borderRadius: 14,
+    borderRadius: 18,
     padding: 14,
-    transition: 'opacity 200ms var(--ease), transform 200ms var(--ease)',
+    boxShadow: 'var(--sombra)',
+    transition:
+      'opacity 380ms var(--ease), transform 380ms var(--ease), background-color 200ms var(--ease), border-color 600ms var(--ease)',
   },
-  ticketSaliendo: { opacity: 0, transform: 'scale(0.92)', pointerEvents: 'none' },
-  titulo: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, fontSize: 20, paddingBottom: 8, borderBottom: '1px solid #e2dce8' },
+  ticketListo: { opacity: 0, transform: 'scale(0.9) translateY(-6px)', background: '#effaf3', borderColor: '#8fd3ad', pointerEvents: 'none' },
+  ticketVisto: { opacity: 0, transform: 'scale(0.94)', pointerEvents: 'none' },
+  check: {
+    position: 'absolute',
+    inset: 0,
+    display: 'grid',
+    placeItems: 'center',
+    fontSize: 64,
+    fontWeight: 900,
+    color: '#2E7D4F',
+    zIndex: 1,
+  },
+  titulo: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 20, paddingBottom: 8, borderBottom: '1px solid var(--linea)' },
+  minutos: { flex: 'none', padding: '2px 10px', borderRadius: 99, fontSize: 15, fontWeight: 800, transition: 'background-color 600ms var(--ease), color 600ms var(--ease)' },
   badgeServir: { color: '#4B1E4D' },
-  badgeLlevar: { color: 'white', background: '#4B1E4D', padding: '2px 8px', borderRadius: 6, whiteSpace: 'nowrap' },
+  badgeLlevar: { color: 'white', background: '#4B1E4D', padding: '2px 8px', borderRadius: 8, whiteSpace: 'nowrap', fontSize: 16 },
   linea: { margin: 0, fontSize: 19 },
-  listo: { marginTop: 'auto', padding: 14, borderRadius: 12, border: 'none', background: '#F2A900', fontSize: 17, fontWeight: 800, cursor: 'pointer' },
-  enterado: { marginTop: 'auto', padding: 14, borderRadius: 12, border: 'none', background: '#efe9f3', fontSize: 17, fontWeight: 800, cursor: 'pointer' },
-  nota: { background: '#efe9f3', borderRadius: 10, padding: 10, fontSize: 13, color: '#5b4d63', marginTop: 16 },
+  boton: { marginTop: 'auto' },
 }
