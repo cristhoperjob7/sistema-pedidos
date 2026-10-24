@@ -18,6 +18,7 @@ export default function Menu({ restaurante }) {
   const [aviso, setAviso] = useState('')
   const [nuevaCat, setNuevaCat] = useState({ nombre: '', va_a_cocina: true, tipo: 'plato' })
   const [nuevos, setNuevos] = useState({}) // { [categoriaId]: { nombre, precio } }
+  const [mostrarCat, setMostrarCat] = useState(false)
 
   async function cargar() {
     const c = await supabase.from('categorias').select('*').eq('restaurante_id', restaurante.id).order('orden')
@@ -57,6 +58,7 @@ export default function Menu({ restaurante }) {
       .insert({ restaurante_id: restaurante.id, nombre, va_a_cocina: nuevaCat.va_a_cocina, tipo: nuevaCat.tipo, orden })
     if (error) return setError(error.message)
     setNuevaCat({ nombre: '', va_a_cocina: true, tipo: 'plato' })
+    setMostrarCat(false)
     cargar()
   }
 
@@ -110,47 +112,11 @@ export default function Menu({ restaurante }) {
     <div style={s.pagina}>
       <h3 style={{ margin: 0 }}>Menú de {restaurante.nombre}</h3>
       <small>
-        Los precios están en {restaurante.moneda_codigo} ({restaurante.moneda_simbolo}). Edita un nombre o un precio y
-        se guarda al salir del campo. Los productos desactivados dejan de aparecer para pedir, pero se conserva su
-        historial. El "Tipo" de cada categoría (Plato, Postre, Bebida, Otro) no afecta el pedido: solo se usa para
-        armar el Reporte mensual.
+        Precios en {restaurante.moneda_codigo} ({restaurante.moneda_simbolo}). Toca un nombre o precio para editarlo.
       </small>
 
       {error && <p style={{ color: 'crimson', margin: 0 }}>{error}</p>}
       {aviso && <p style={{ color: 'green', margin: 0 }}>{aviso}</p>}
-
-      <form onSubmit={crearCategoria} style={s.form}>
-        <b>Agregar categoría</b>
-        <input
-          style={s.input}
-          placeholder="Nombre (ej: Entradas, Bebidas)"
-          value={nuevaCat.nombre}
-          onChange={(e) => setNuevaCat((n) => ({ ...n, nombre: e.target.value }))}
-        />
-        <label style={s.check}>
-          <input
-            type="checkbox"
-            checked={nuevaCat.va_a_cocina}
-            onChange={(e) => setNuevaCat((n) => ({ ...n, va_a_cocina: e.target.checked }))}
-          />
-          Se envía a cocina
-        </label>
-        <label style={s.label}>
-          Tipo (para el reporte mensual)
-          <select
-            style={s.input}
-            value={nuevaCat.tipo}
-            onChange={(e) => setNuevaCat((n) => ({ ...n, tipo: e.target.value }))}
-          >
-            {TIPOS.map(([v, t]) => (
-              <option key={v} value={v}>
-                {t}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button style={s.boton}>Agregar categoría</button>
-      </form>
 
       {cats.length === 0 && <p style={{ margin: 0 }}>Todavía no hay categorías.</p>}
 
@@ -232,6 +198,50 @@ export default function Menu({ restaurante }) {
           </section>
         )
       })}
+
+      {mostrarCat ? (
+        <form onSubmit={crearCategoria} className="aparece" style={s.form}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <b>Agregar categoría</b>
+            <button type="button" style={s.botonSec} onClick={() => setMostrarCat(false)}>
+              Cancelar
+            </button>
+          </div>
+          <input
+            style={s.input}
+            placeholder="Nombre (ej: Entradas, Bebidas)"
+            value={nuevaCat.nombre}
+            onChange={(e) => setNuevaCat((n) => ({ ...n, nombre: e.target.value }))}
+          />
+          <label style={s.check}>
+            <input
+              type="checkbox"
+              checked={nuevaCat.va_a_cocina}
+              onChange={(e) => setNuevaCat((n) => ({ ...n, va_a_cocina: e.target.checked }))}
+            />
+            Se envía a cocina
+          </label>
+          <label style={s.label}>
+            Tipo (para el reporte mensual)
+            <select
+              style={s.input}
+              value={nuevaCat.tipo}
+              onChange={(e) => setNuevaCat((n) => ({ ...n, tipo: e.target.value }))}
+            >
+              {TIPOS.map(([v, t]) => (
+                <option key={v} value={v}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button style={s.boton}>Agregar categoría</button>
+        </form>
+      ) : (
+        <button style={{ ...s.boton, width: '100%' }} onClick={() => setMostrarCat(true)}>
+          + Agregar categoría
+        </button>
+      )}
     </div>
   )
 }
@@ -244,6 +254,7 @@ const s = {
   fila: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
   precio: { display: 'flex', alignItems: 'center', gap: 4 },
   check: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 },
+  label: { display: 'grid', gap: 4, fontSize: 14, fontWeight: 600 },
   input: { padding: 10, fontSize: 16, borderRadius: 8, border: '1px solid #bbb', boxSizing: 'border-box' },
   boton: { padding: 10, fontSize: 15, fontWeight: 700, borderRadius: 8, border: 'none', background: '#F2A900', cursor: 'pointer' },
   botonSec: { padding: 8, fontSize: 14, borderRadius: 8, border: '1px solid #bbb', background: 'white', cursor: 'pointer' },

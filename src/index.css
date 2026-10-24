@@ -4,6 +4,12 @@
   box-sizing: border-box;
 }
 
+:root {
+  /* Una sola curva y duración para que todo el sistema se sienta igual de "suave". */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur: 150ms;
+}
+
 html {
   -webkit-text-size-adjust: 100%;
   /* Reserva el espacio de la barra de desplazamiento: la página no "salta"
@@ -32,10 +38,25 @@ textarea {
 
 button {
   touch-action: manipulation; /* evita el zoom por doble toque en celulares */
+  transition: transform var(--dur) var(--ease), filter var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+
+/* Se "hunde" levemente al tocarlo: confirma que el toque registró antes de que pase nada más. */
+button:active:not(:disabled) {
+  transform: scale(0.96);
+  filter: brightness(0.96);
 }
 
 button:disabled {
   cursor: default;
+  opacity: 0.6;
+}
+
+/* Que aparecer y desaparecer (tickets, paneles, tarjetas) se sienta igual de suave que los botones. */
+input,
+select,
+textarea {
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
 
 /* Contorno visible al navegar con teclado */
@@ -52,6 +73,39 @@ h2,
 h3,
 h4 {
   line-height: 1.2;
+}
+
+/* Rebote corto: confirma que un número cambió (ej: contador de cantidad). Se usa con key={valor}
+   para que React vuelva a montar el elemento y la animación se repita en cada cambio. */
+@keyframes pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.3);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.contador-pop {
+  display: inline-block;
+  animation: pop 220ms var(--ease);
+}
+
+/* Entrada suave para paneles y tarjetas que aparecen de golpe (tickets nuevos, paneles de confirmación). */
+@keyframes aparece {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.aparece {
+  animation: aparece var(--dur) var(--ease);
 }
 
 @media (prefers-reduced-motion: reduce) {

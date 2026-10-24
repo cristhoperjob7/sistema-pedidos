@@ -124,12 +124,20 @@ export default function Mesera({ restaurante }) {
           return (
             <button
               key={m.id}
+              className="aparece"
               style={{ ...s.mesa, borderColor: ocupada ? '#B3261E' : '#2E7D4F' }}
               onClick={() => setVista({ nombre: 'mesa', mesaId: m.id })}
             >
               <b style={{ fontSize: 26 }}>{m.numero}</b>
               {m.nombre && <small style={{ color: '#6f6477' }}>{m.nombre}</small>}
-              <span style={{ fontWeight: 600, fontSize: 14, color: ocupada ? '#B3261E' : '#2E7D4F' }}>
+              <span
+                style={{
+                  fontWeight: 600,
+                  fontSize: 14,
+                  color: ocupada ? '#B3261E' : '#2E7D4F',
+                  transition: 'color var(--dur) var(--ease)',
+                }}
+              >
                 {ocupada ? 'Ocupada' : 'Libre'}
               </span>
               <small style={{ color: '#6f6477' }}>
@@ -262,8 +270,10 @@ function Mesa({ restaurante, datos, mesa, pedido, items, onVolver, onCobrar, rec
       {error && <p style={{ color: 'crimson' }}>{error}</p>}
 
       {grupos.length > 0 && pedido && (
-        <>
-          <h3 style={s.titulo}>Pedido #{pedido.numero}</h3>
+        <div style={s.pedidoCard}>
+          <h3 style={{ ...s.titulo, margin: '0 0 8px' }}>
+            Pedido #{pedido.numero} <small style={{ fontWeight: 400, color: '#6f6477' }}>· ya enviado</small>
+          </h3>
           {grupos.map((g) => (
             <div key={g.clave} style={s.fila}>
               <div style={{ flex: 1, minWidth: 140 }}>
@@ -284,7 +294,9 @@ function Mesa({ restaurante, datos, mesa, pedido, items, onVolver, onCobrar, rec
                       <button style={s.menos} onClick={() => setCq((n) => Math.max(1, n - 1))}>
                         −
                       </button>
-                      <b>{Math.min(cq, g.cantidad)}</b>
+                      <b key={cq} className="contador-pop" style={{ minWidth: 18, textAlign: 'center' }}>
+                        {Math.min(cq, g.cantidad)}
+                      </b>
                       <button style={s.mas} onClick={() => setCq((n) => Math.min(g.cantidad, n + 1))}>
                         +
                       </button>
@@ -333,9 +345,10 @@ function Mesa({ restaurante, datos, mesa, pedido, items, onVolver, onCobrar, rec
               ANULAR ORDEN COMPLETA
             </button>
           )}
-          <h3 style={s.titulo}>Agregar al pedido</h3>
-        </>
+        </div>
       )}
+
+      {grupos.length > 0 && pedido && <h3 style={s.titulo}>Agregar al pedido</h3>}
 
       <div style={s.chips}>
         {datos.cats.map((c) => (
@@ -365,7 +378,9 @@ function Mesa({ restaurante, datos, mesa, pedido, items, onVolver, onCobrar, rec
                   <button style={s.menos} onClick={() => cambiar(p, -1)}>
                     −
                   </button>
-                  <b style={{ minWidth: 18, textAlign: 'center' }}>{q}</b>
+                  <b key={q} className="contador-pop" style={{ minWidth: 18, textAlign: 'center' }}>
+                    {q}
+                  </b>
                 </>
               )}
               <button style={s.mas} onClick={() => cambiar(p, 1)}>
@@ -505,10 +520,20 @@ const s = {
     background: 'white',
     cursor: 'pointer',
     font: 'inherit',
+    transition: 'border-color var(--dur) var(--ease)',
   },
   cabecera: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 },
   volver: { border: 'none', background: 'none', fontSize: 16, color: '#4B1E4D', cursor: 'pointer', fontWeight: 600 },
   titulo: { margin: '16px 0 8px', fontSize: 17 },
+  pedidoCard: {
+    background: '#f4f0f6',
+    border: '1px solid #e2dce8',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 14,
+    display: 'grid',
+    gap: 8,
+  },
   fila: {
     display: 'flex',
     flexWrap: 'wrap',

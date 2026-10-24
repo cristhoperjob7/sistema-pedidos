@@ -171,7 +171,7 @@ export default function Reporte({ restaurante }) {
 
       {r && (
         <>
-          <div style={s.kpis}>
+          <div className="aparece" style={s.kpis}>
             <div style={s.kpi}>
               <small style={s.suave}>Vendido</small>
               <b style={s.kpiValor}>{formatear(r.vendido, restaurante)}</b>
@@ -217,7 +217,7 @@ export default function Reporte({ restaurante }) {
             )
           })}
 
-          <h4 style={s.titulo}>Por mesera</h4>
+          <h4 style={s.titulo}>Por salón</h4>
           {r.meseras.length === 0 && <small style={s.suave}>Sin ventas todavía.</small>}
           {r.meseras.map(([nombre, m]) => (
             <div key={nombre} style={s.fila}>

@@ -51,6 +51,7 @@ export default function Superadmin() {
   const [nombreBorrar, setNombreBorrar] = useState('')
   const [errorBorrar, setErrorBorrar] = useState('')
   const [eliminando, setEliminando] = useState(false)
+  const [mostrarCrear, setMostrarCrear] = useState(false)
 
   async function cargar() {
     const { data, error } = await supabase.from('restaurantes').select('*').order('creado_en')
@@ -96,6 +97,7 @@ export default function Superadmin() {
     setAviso('Restaurante creado.')
     setForm(FORM_INICIAL)
     setSlugManual(false)
+    setMostrarCrear(false)
     cargar()
   }
 
@@ -159,90 +161,16 @@ export default function Superadmin() {
   }
 
   const ejemplo = `${form.simbolo} ${(12.5).toFixed(Number(form.decimales) || 0)}`
+  // Mientras se administra o se confirma borrar un restaurante, "Crear restaurante" se esconde
+  // (encogiéndose, no de golpe) para no competir visualmente con esa tarea.
+  const hayPanelAbierto = abierto !== null || borrando !== null
 
   return (
     <div style={s.pagina}>
-      <h2>Crear restaurante</h2>
-      <form onSubmit={crear} style={s.form}>
-        <label style={s.label}>
-          Nombre del restaurante
-          <input style={s.input} value={form.nombre} onChange={(e) => cambiarNombre(e.target.value)} />
-        </label>
-        <label style={s.label}>
-          Código para el login del personal
-          <input
-            style={s.input}
-            value={form.slug}
-            onChange={(e) => {
-              setSlugManual(true)
-              setForm((f) => ({ ...f, slug: crearSlug(e.target.value) }))
-            }}
-          />
-        </label>
-        <label style={s.label}>
-          Moneda sugerida
-          <select style={s.input} value={form.codigo} onChange={(e) => elegirMoneda(e.target.value)}>
-            {MONEDAS.map((m) => (
-              <option key={m.codigo} value={m.codigo}>
-                {m.nombre} ({m.codigo})
-              </option>
-            ))}
-            {!MONEDAS.some((m) => m.codigo === form.codigo) && (
-              <option value={form.codigo}>Otra ({form.codigo})</option>
-            )}
-          </select>
-        </label>
-        <div style={s.fila}>
-          <label style={s.label}>
-            Código
-            <input
-              style={s.input}
-              value={form.codigo}
-              onChange={(e) => setForm((f) => ({ ...f, codigo: e.target.value.toUpperCase() }))}
-            />
-          </label>
-          <label style={s.label}>
-            Símbolo
-            <input
-              style={s.input}
-              value={form.simbolo}
-              onChange={(e) => setForm((f) => ({ ...f, simbolo: e.target.value }))}
-            />
-          </label>
-          <label style={s.label}>
-            Decimales
-            <select
-              style={s.input}
-              value={form.decimales}
-              onChange={(e) => setForm((f) => ({ ...f, decimales: e.target.value }))}
-            >
-              {[0, 1, 2, 3].map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <label style={s.label}>
-          Zona horaria (define cuándo empieza cada día)
-          <select style={s.input} value={form.zona} onChange={(e) => setForm((f) => ({ ...f, zona: e.target.value }))}>
-            {ZONAS.map(([zona, nombre]) => (
-              <option key={zona} value={zona}>
-                {nombre} ({zona})
-              </option>
-            ))}
-          </select>
-        </label>
-        <small>Así se verán los precios: {ejemplo}</small>
-        {error && <p style={{ color: 'crimson', margin: 0 }}>{error}</p>}
-        {aviso && <p style={{ color: 'green', margin: 0 }}>{aviso}</p>}
-        <button style={s.boton} disabled={guardando}>
-          {guardando ? 'Creando...' : 'Crear restaurante'}
-        </button>
-      </form>
+      <h2 style={{ margin: 0 }}>Restaurantes ({lista.length})</h2>
+      {error && <p style={{ color: 'crimson', margin: 0 }}>{error}</p>}
+      {aviso && <p style={{ color: 'green', margin: 0 }}>{aviso}</p>}
 
-      <h2>Restaurantes ({lista.length})</h2>
       {lista.map((r) => (
         <div key={r.id}>
           <div style={s.tarjeta}>
@@ -284,7 +212,7 @@ export default function Superadmin() {
           </div>
           </div>
           {abierto === r.id && (
-            <div style={s.panelAdmin}>
+            <div className="aparece" style={s.panelAdmin}>
               <Anclar block="start" />
               <b style={s.panelAdminTitulo}>Administrando: {r.nombre}</b>
               <Admin restaurante={r} />
@@ -292,7 +220,7 @@ export default function Superadmin() {
           )}
 
           {borrando === r.id && (
-            <div style={s.confirmar}>
+            <div className="aparece" style={s.confirmar}>
               <Anclar block="center" />
               <p style={{ margin: 0, fontWeight: 700, color: '#B3261E' }}>
                 Vas a eliminar "{r.nombre}" para siempre
@@ -327,6 +255,105 @@ export default function Superadmin() {
           )}
         </div>
       ))}
+
+      <div
+        style={{
+          maxHeight: hayPanelAbierto ? 0 : 800,
+          opacity: hayPanelAbierto ? 0 : 1,
+          overflow: 'hidden',
+          transition: 'max-height var(--dur) var(--ease), opacity var(--dur) var(--ease)',
+        }}
+        aria-hidden={hayPanelAbierto}
+      >
+      {mostrarCrear ? (
+        <form onSubmit={crear} className="aparece" style={s.form}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <b>Crear restaurante</b>
+            <button type="button" style={s.botonSec} onClick={() => setMostrarCrear(false)}>
+              Cancelar
+            </button>
+          </div>
+          <label style={s.label}>
+            Nombre del restaurante
+            <input style={s.input} value={form.nombre} onChange={(e) => cambiarNombre(e.target.value)} />
+          </label>
+          <label style={s.label}>
+            Código para el login del personal
+            <input
+              style={s.input}
+              value={form.slug}
+              onChange={(e) => {
+                setSlugManual(true)
+                setForm((f) => ({ ...f, slug: crearSlug(e.target.value) }))
+              }}
+            />
+          </label>
+          <label style={s.label}>
+            Moneda sugerida
+            <select style={s.input} value={form.codigo} onChange={(e) => elegirMoneda(e.target.value)}>
+              {MONEDAS.map((m) => (
+                <option key={m.codigo} value={m.codigo}>
+                  {m.nombre} ({m.codigo})
+                </option>
+              ))}
+              {!MONEDAS.some((m) => m.codigo === form.codigo) && (
+                <option value={form.codigo}>Otra ({form.codigo})</option>
+              )}
+            </select>
+          </label>
+          <div style={s.fila}>
+            <label style={s.label}>
+              Código
+              <input
+                style={s.input}
+                value={form.codigo}
+                onChange={(e) => setForm((f) => ({ ...f, codigo: e.target.value.toUpperCase() }))}
+              />
+            </label>
+            <label style={s.label}>
+              Símbolo
+              <input
+                style={s.input}
+                value={form.simbolo}
+                onChange={(e) => setForm((f) => ({ ...f, simbolo: e.target.value }))}
+              />
+            </label>
+            <label style={s.label}>
+              Decimales
+              <select
+                style={s.input}
+                value={form.decimales}
+                onChange={(e) => setForm((f) => ({ ...f, decimales: e.target.value }))}
+              >
+                {[0, 1, 2, 3].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <label style={s.label}>
+            Zona horaria (define cuándo empieza cada día)
+            <select style={s.input} value={form.zona} onChange={(e) => setForm((f) => ({ ...f, zona: e.target.value }))}>
+              {ZONAS.map(([zona, nombre]) => (
+                <option key={zona} value={zona}>
+                  {nombre} ({zona})
+                </option>
+              ))}
+            </select>
+          </label>
+          <small>Así se verán los precios: {ejemplo}</small>
+          <button style={s.boton} disabled={guardando}>
+            {guardando ? 'Creando...' : 'Crear restaurante'}
+          </button>
+        </form>
+      ) : (
+        <button style={{ ...s.boton, width: '100%' }} onClick={() => setMostrarCrear(true)}>
+          + Crear restaurante
+        </button>
+      )}
+      </div>
     </div>
   )
 }

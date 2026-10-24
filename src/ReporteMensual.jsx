@@ -188,7 +188,7 @@ export default function ReporteMensual({ restaurante }) {
 
       {r && r.cuentas > 0 && (
         <>
-          <div style={s.tarjetaGrande}>
+          <div className="aparece" style={s.tarjetaGrande}>
             <small style={s.suaveClaro}>Total vendido en el mes</small>
             <b style={s.numeroGrande}>{formatear(r.vendido, restaurante)}</b>
             {cambio != null && (
@@ -244,7 +244,7 @@ export default function ReporteMensual({ restaurante }) {
             ¿Algo aparece en la sección equivocada? Corrige el "Tipo" de esa categoría en el Menú.
           </small>
 
-          <h4 style={s.titulo}>Por mesera</h4>
+          <h4 style={s.titulo}>Por salón</h4>
           {r.meseras.map(([nombre, m]) => (
             <div key={nombre} style={s.fila}>
               <span>

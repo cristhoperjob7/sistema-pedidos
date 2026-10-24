@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import Anclar from './Anclar'
 
-const ROLES = { admin: 'Administrador', mesera: 'Mesera', cocina: 'Cocina' }
+// La clave interna sigue siendo "mesera" (así está guardado en la base de datos y en las
+// reglas de seguridad); solo cambia el texto que ve la persona, para que sirva sin importar
+// el género de quien atiende el salón.
+const ROLES = { admin: 'Administrador', mesera: 'Salón', cocina: 'Cocina' }
 const FORM_INICIAL = { nombre: '', username: '', rol: 'mesera', pin: '' }
 
 async function llamar(body) {
@@ -22,6 +25,7 @@ export default function Personal({ restaurante, scrollAlAbrir = false }) {
   const [cambioRol, setCambioRol] = useState(null) // { m, rol } mientras se pide el acceso nuevo
   const [pinRol, setPinRol] = useState('')
   const [miUid, setMiUid] = useState(null) // para reconocer mi propia fila en la lista
+  const [mostrarForm, setMostrarForm] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setMiUid(data.user?.id ?? null))
@@ -54,6 +58,7 @@ export default function Personal({ restaurante, scrollAlAbrir = false }) {
     }
     setAviso(`Listo. ${form.nombre} entra con el código “${restaurante.slug}” y el usuario “${form.username}”.`)
     setForm(FORM_INICIAL)
+    setMostrarForm(false)
     cargar()
   }
 
@@ -114,42 +119,11 @@ export default function Personal({ restaurante, scrollAlAbrir = false }) {
   return (
     <div style={s.caja}>
       {scrollAlAbrir && <Anclar block="start" />}
-      <h3 style={{ margin: 0 }}>Personal de {restaurante.nombre}</h3>
-
-      <form onSubmit={crear} style={s.form}>
-        <b>Agregar persona</b>
-        <input
-          style={s.input}
-          placeholder="Nombre (ej: Rosa Pérez)"
-          value={form.nombre}
-          onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
-        />
-        <input
-          style={s.input}
-          placeholder="Usuario (ej: rosa)"
-          value={form.username}
-          onChange={(e) => setForm((f) => ({ ...f, username: e.target.value.toLowerCase().replace(/\s/g, '') }))}
-        />
-        <select style={s.input} value={form.rol} onChange={(e) => setForm((f) => ({ ...f, rol: e.target.value, pin: '' }))}>
-          {Object.entries(ROLES).map(([valor, nombre]) => (
-            <option key={valor} value={valor}>
-              {nombre}
-            </option>
-          ))}
-        </select>
-        <input
-          style={s.input}
-          type={esAdmin ? 'password' : 'text'}
-          inputMode={esAdmin ? 'text' : 'numeric'}
-          maxLength={esAdmin ? 72 : 4}
-          placeholder={esAdmin ? 'Contraseña (mínimo 8 caracteres)' : 'PIN de 4 dígitos'}
-          value={form.pin}
-          onChange={(e) => setForm((f) => ({ ...f, pin: esAdmin ? e.target.value : e.target.value.replace(/\D/g, '') }))}
-        />
-        <button style={s.boton} disabled={trabajando}>
-          {trabajando ? 'Creando...' : 'Crear'}
-        </button>
-      </form>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+        <h3 style={{ margin: 0 }}>
+          Personal de {restaurante.nombre} <small style={{ fontWeight: 400, color: '#6f6477' }}>· {lista.length}</small>
+        </h3>
+      </div>
 
       {error && <p style={{ color: 'crimson', margin: 0 }}>{error}</p>}
       {aviso && <p style={{ color: 'green', margin: 0 }}>{aviso}</p>}
@@ -242,6 +216,52 @@ export default function Personal({ restaurante, scrollAlAbrir = false }) {
           </div>
         )
       })}
+
+      {mostrarForm ? (
+        <form onSubmit={crear} className="aparece" style={s.form}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <b>Agregar persona</b>
+            <button type="button" style={s.botonSec} onClick={() => setMostrarForm(false)}>
+              Cancelar
+            </button>
+          </div>
+          <input
+            style={s.input}
+            placeholder="Nombre (ej: Rosa Pérez)"
+            value={form.nombre}
+            onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
+          />
+          <input
+            style={s.input}
+            placeholder="Usuario (ej: rosa)"
+            value={form.username}
+            onChange={(e) => setForm((f) => ({ ...f, username: e.target.value.toLowerCase().replace(/\s/g, '') }))}
+          />
+          <select style={s.input} value={form.rol} onChange={(e) => setForm((f) => ({ ...f, rol: e.target.value, pin: '' }))}>
+            {Object.entries(ROLES).map(([valor, nombre]) => (
+              <option key={valor} value={valor}>
+                {nombre}
+              </option>
+            ))}
+          </select>
+          <input
+            style={s.input}
+            type={esAdmin ? 'password' : 'text'}
+            inputMode={esAdmin ? 'text' : 'numeric'}
+            maxLength={esAdmin ? 72 : 4}
+            placeholder={esAdmin ? 'Contraseña (mínimo 8 caracteres)' : 'PIN de 4 dígitos'}
+            value={form.pin}
+            onChange={(e) => setForm((f) => ({ ...f, pin: esAdmin ? e.target.value : e.target.value.replace(/\D/g, '') }))}
+          />
+          <button style={s.boton} disabled={trabajando}>
+            {trabajando ? 'Creando...' : 'Crear'}
+          </button>
+        </form>
+      ) : (
+        <button style={{ ...s.boton, width: '100%' }} onClick={() => setMostrarForm(true)}>
+          + Agregar personal
+        </button>
+      )}
     </div>
   )
 }

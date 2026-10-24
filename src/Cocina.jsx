@@ -11,6 +11,7 @@ export default function Cocina({ restaurante }) {
   const [error, setError] = useState('')
   const [sonidoListo, setSonidoListo] = useState(false)
   const [ahora, setAhora] = useState(Date.now())
+  const [saliendo, setSaliendo] = useState(() => new Set()) // ids que se están desvaneciendo antes de quitarse
   const vistos = useRef(null) // tickets ya conocidos; null en la primera carga para no sonar
   const audio = useRef(null)
   const ajustesRef = useRef(ajustes)
@@ -118,7 +119,16 @@ export default function Cocina({ restaurante }) {
   }, [cargar, restaurante.id])
 
   async function resolver(ticket, estado) {
-    setTickets((prev) => prev.filter((x) => x.id !== ticket.id)) // desaparece al instante
+    // Se desvanece suave y recién al terminar la animación se quita de la lista.
+    setSaliendo((s) => new Set(s).add(ticket.id))
+    setTimeout(() => {
+      setTickets((prev) => prev.filter((x) => x.id !== ticket.id))
+      setSaliendo((s) => {
+        const n = new Set(s)
+        n.delete(ticket.id)
+        return n
+      })
+    }, 200)
     const { error } = await supabase
       .from('envios_cocina')
       .update({ estado, resuelto_en: new Date().toISOString() })
@@ -162,9 +172,15 @@ export default function Cocina({ restaurante }) {
           const llevar = t.modalidad === 'llevar'
           const esAnulacion = TIPOS_ANULACION.includes(t.tipo)
 
+          const estiloSalida = saliendo.has(t.id) ? s.ticketSaliendo : null
+
           if (esAnulacion) {
             return (
-              <div key={t.id} style={{ ...s.ticket, borderColor: '#B3261E', background: '#fdf0ef' }}>
+              <div
+                key={t.id}
+                className="aparece"
+                style={{ ...s.ticket, borderColor: '#B3261E', background: '#fdf0ef', ...estiloSalida }}
+              >
                 <div style={s.titulo}>
                   <b>
                     {mesa} · {numero}
@@ -189,7 +205,7 @@ export default function Cocina({ restaurante }) {
           const borde =
             min >= ajustes.alerta_roja_min ? '#B3261E' : min >= ajustes.alerta_amarilla_min ? '#F2A900' : '#e2dce8'
           return (
-            <div key={t.id} style={{ ...s.ticket, borderColor: borde }}>
+            <div key={t.id} className="aparece" style={{ ...s.ticket, borderColor: borde, ...estiloSalida }}>
               <div style={s.titulo}>
                 <b>
                   {mesa} ·{' '}
@@ -226,7 +242,17 @@ const s = {
   cabecera: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 12 },
   activar: { padding: '12px 16px', borderRadius: 12, border: 'none', background: '#F2A900', fontSize: 15, fontWeight: 800, cursor: 'pointer' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 },
-  ticket: { display: 'flex', flexDirection: 'column', gap: 8, background: 'white', border: '3px solid', borderRadius: 14, padding: 14 },
+  ticket: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    background: 'white',
+    border: '3px solid',
+    borderRadius: 14,
+    padding: 14,
+    transition: 'opacity 200ms var(--ease), transform 200ms var(--ease)',
+  },
+  ticketSaliendo: { opacity: 0, transform: 'scale(0.92)', pointerEvents: 'none' },
   titulo: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, fontSize: 20, paddingBottom: 8, borderBottom: '1px solid #e2dce8' },
   badgeServir: { color: '#4B1E4D' },
   badgeLlevar: { color: 'white', background: '#4B1E4D', padding: '2px 8px', borderRadius: 6, whiteSpace: 'nowrap' },
