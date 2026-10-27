@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
-import { formatear, leerPrecio } from './moneda'
+import { formatear, leerPrecio, soloPrecio } from './moneda'
 import Campo from './Campo'
 import { Cargando, Desplegable, Interruptor, Mensaje } from './ui'
 import { avisar, sentir, sonar, vibrar } from './feedback'
@@ -257,7 +257,8 @@ export default function Menu({ restaurante }) {
                   <Campo
                     className="campo-chico"
                     style={{ width: 104 }}
-                    inputMode="decimal"
+                    inputMode={restaurante.moneda_decimales > 0 ? 'decimal' : 'numeric'}
+                    filtro={(t) => soloPrecio(t, restaurante)}
                     valor={Number(p.precio).toFixed(restaurante.moneda_decimales)}
                     onGuardar={(t) => guardarPrecio(p, t)}
                     title={`Ejemplo: ${formatear(12.5, restaurante)}`}
@@ -282,10 +283,10 @@ export default function Menu({ restaurante }) {
                 <input
                   className="campo-chico"
                   style={{ width: 104 }}
-                  inputMode="decimal"
+                  inputMode={restaurante.moneda_decimales > 0 ? 'decimal' : 'numeric'}
                   placeholder={paso === '1' ? '0' : '0.00'}
                   value={f.precio}
-                  onChange={(e) => setNuevos((n) => ({ ...n, [c.id]: { ...f, precio: e.target.value } }))}
+                  onChange={(e) => setNuevos((n) => ({ ...n, [c.id]: { ...f, precio: soloPrecio(e.target.value, restaurante) } }))}
                 />
               </div>
               <button className="btn btn-chico btn-principal">+ Agregar</button>
