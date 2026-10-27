@@ -12,7 +12,9 @@ export function formatear(valor, restaurante) {
 export function leerPrecio(texto, restaurante) {
   const t = String(texto).trim()
   // Sin decimales (ej. peso chileno) el punto es separador de miles: "8.000" = 8000.
-  const n = (restaurante.moneda_decimales ?? 2) === 0 ? Number(t.replace(/\D/g, '') || NaN) : Number(t.replace(',', '.'))
+  const miles = /^\d{1,3}([.,]\d{3})+$/.test(t) // "3.555" o "1,250,000" son miles, no decimales
+  const n =
+    (restaurante.moneda_decimales ?? 2) === 0 || miles ? Number(t.replace(/\D/g, '') || NaN) : Number(t.replace(',', '.'))
   if (!Number.isFinite(n) || n < 0 || n > 9999999) return null
   const f = 10 ** (restaurante.moneda_decimales ?? 2)
   return Math.round(n * f) / f
