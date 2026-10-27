@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from './supabase'
-import { audioCtx, sentir, sonar } from './feedback'
+import { audioCtx, audioDesbloqueado, escucharAudio, sentir } from './feedback'
 import { Cargando, Desplegable, Mensaje } from './ui'
+import Agotados from './Agotados'
 
 const TIPOS_ANULACION = ['anulacion', 'anulacion_total']
 
@@ -11,7 +12,7 @@ export default function Cocina({ restaurante }) {
   const [ajustes, setAjustes] = useState({ alerta_amarilla_min: 5, alerta_roja_min: 10, sonido_activo: true })
   const [listos, setListos] = useState(0)
   const [error, setError] = useState('')
-  const [sonidoListo, setSonidoListo] = useState(false)
+  const [audioListo, setAudioListo] = useState(audioDesbloqueado)
   const [ahora, setAhora] = useState(Date.now())
   const [saliendo, setSaliendo] = useState(() => new Map()) // id -> 'listo' | 'visto' mientras se despide
   const [recientes, setRecientes] = useState(() => new Set()) // tickets recién llegados (anillo de aviso)
@@ -22,6 +23,9 @@ export default function Cocina({ restaurante }) {
   useEffect(() => {
     ajustesRef.current = ajustes
   }, [ajustes])
+
+  // El audio se activa solo con el primer toque en la app (normalmente el del login).
+  useEffect(() => escucharAudio(setAudioListo), [])
 
   // Timbre de dos notas para pedidos nuevos; aviso grave de tres tonos para anulaciones.
   // Es más fuerte que los sonidos de la interfaz: tiene que oírse en una cocina con ruido.
@@ -49,18 +53,6 @@ export default function Cocina({ restaurante }) {
     }
   }
 
-  function activarSonido() {
-    // En iPhone/iPad (Safari 17+) esto hace que el aviso suene aunque el equipo esté en silencio.
-    try {
-      if (navigator.audioSession) navigator.audioSession.type = 'playback'
-    } catch {
-      // no soportado
-    }
-    sentir('exito')
-    timbre('nuevo')
-    setSonidoListo(true)
-  }
-
   const cargar = useCallback(async () => {
     const rid = restaurante.id
     const inicioDia = new Date()
@@ -69,7 +61,7 @@ export default function Cocina({ restaurante }) {
       supabase
         .from('envios_cocina')
         .select(
-          'id, tipo, modalidad, creado_en, pedidos(numero, mesa_numero, mesas(numero)), items_pedido(nombre, cantidad), anulaciones(nombre, cantidad)'
+          'id, tipo, modalidad, creado_en, pedidos(numero, mesa_numero, llevar_numero, cliente, mesas(numero)), items_pedido(nombre, cantidad, nota), anulaciones(nombre, cantidad)'
         )
         .eq('restaurante_id', rid)
         .eq('estado', 'pendiente')
@@ -160,10 +152,16 @@ export default function Cocina({ restaurante }) {
     cargar()
   }
 
+  // Junta unidades iguales; el mismo plato con otra nota queda en otra línea.
   function juntar(lista) {
     const g = new Map()
-    lista.forEach((i) => g.set(i.nombre, (g.get(i.nombre) ?? 0) + i.cantidad))
-    return [...g.entries()]
+    lista.forEach((i) => {
+      const clave = `${i.nombre}\u0000${i.nota ?? ''}`
+      const x = g.get(clave) ?? { nombre: i.nombre, nota: i.nota ?? '', cantidad: 0 }
+      x.cantidad += i.cantidad
+      g.set(clave, x)
+    })
+    return [...g.values()]
   }
 
   if (!tickets) {
@@ -190,14 +188,18 @@ export default function Cocina({ restaurante }) {
             </span>
           </div>
         </div>
-        <Desplegable abierto={ajustes.sonido_activo && !sonidoListo}>
-          <button className="btn btn-principal respira" onClick={activarSonido}>
-            🔔 Activar sonido
-          </button>
-        </Desplegable>
       </div>
 
+      <Agotados restaurante={restaurante} soloPlatos />
+
       <Mensaje tipo="error">{error}</Mensaje>
+      {/* Solo aparece si se recargó la página y todavía nadie ha tocado la pantalla: no es un botón,
+          cualquier toque lo resuelve y el aviso se va solo. */}
+      <Desplegable abierto={ajustes.sonido_activo && !audioListo}>
+        <p className="nota" style={{ margin: '0 0 12px' }}>
+          🔕 Toca cualquier parte de la pantalla una vez para que suenen los avisos.
+        </p>
+      </Desplegable>
       {tickets.length === 0 && (
         <div className="vacio aparece">
           <span className="vacio-icono">✨</span>
@@ -210,7 +212,10 @@ export default function Cocina({ restaurante }) {
         {tickets.map((t) => {
           const min = Math.max(0, Math.floor((ahora - new Date(t.creado_en).getTime()) / 60000))
           const numero = `#${t.pedidos?.numero ?? '?'}`
-          const mesa = `Mesa ${t.pedidos?.mesas?.numero ?? t.pedidos?.mesa_numero ?? '?'}`
+          const mesa =
+            t.pedidos?.llevar_numero != null
+              ? `Llevar ${t.pedidos.llevar_numero}${t.pedidos.cliente ? ` · ${t.pedidos.cliente}` : ''}`
+              : `Mesa ${t.pedidos?.mesas?.numero ?? t.pedidos?.mesa_numero ?? '?'}`
           const llevar = t.modalidad === 'llevar'
           const esAnulacion = TIPOS_ANULACION.includes(t.tipo)
           const salida = saliendo.get(t.id)
@@ -233,9 +238,9 @@ export default function Cocina({ restaurante }) {
                 <p style={{ margin: 0, fontWeight: 900, color: '#B3261E', fontSize: 18 }}>
                   {t.tipo === 'anulacion_total' ? 'ORDEN COMPLETA ANULADA' : 'ANULADO'}
                 </p>
-                {juntar(t.anulaciones).map(([nombre, cantidad]) => (
-                  <p key={nombre} style={{ ...s.linea, textDecoration: 'line-through', textDecorationColor: '#e7a7a2' }}>
-                    <b>{cantidad}×</b> {nombre}
+                {juntar(t.anulaciones).map((l) => (
+                  <p key={l.nombre} style={{ ...s.linea, textDecoration: 'line-through', textDecorationColor: '#e7a7a2' }}>
+                    <b>{l.cantidad}×</b> {l.nombre}
                   </p>
                 ))}
                 <button className="btn btn-sec btn-grande" style={s.boton} disabled={!!salida} onClick={() => resolver(t, 'visto')}>
@@ -260,8 +265,14 @@ export default function Cocina({ restaurante }) {
               )}
               <div style={s.titulo}>
                 <b>
-                  {mesa} ·{' '}
-                  <span style={llevar ? s.badgeLlevar : s.badgeServir}>{llevar ? 'Para llevar' : 'Servir'}</span>
+                  {mesa}
+                  {/* "Llevar 3 · Juan" ya dice que es para llevar: no se repite la etiqueta. */}
+                  {t.pedidos?.llevar_numero == null && (
+                    <>
+                      {' · '}
+                      <span style={llevar ? s.badgeLlevar : s.badgeServir}>{llevar ? 'Para llevar' : 'Servir'}</span>
+                    </>
+                  )}
                 </b>
                 <span
                   style={{
@@ -277,9 +288,10 @@ export default function Cocina({ restaurante }) {
                 Pedido {numero}
                 {t.tipo === 'adicion' ? ' · adición' : ''}
               </small>
-              {juntar(t.items_pedido).map(([nombre, cantidad]) => (
-                <p key={nombre} style={s.linea}>
-                  <b>{cantidad}×</b> {nombre}
+              {juntar(t.items_pedido).map((l) => (
+                <p key={`${l.nombre}|${l.nota}`} style={s.linea}>
+                  <b>{l.cantidad}×</b> {l.nombre}
+                  {l.nota && <span style={s.nota}>📝 {l.nota}</span>}
                 </p>
               ))}
               <button className="btn btn-principal btn-grande" style={s.boton} disabled={!!salida} onClick={() => resolver(t, 'listo')}>
@@ -332,5 +344,7 @@ const s = {
   badgeServir: { color: '#4B1E4D' },
   badgeLlevar: { color: 'white', background: '#4B1E4D', padding: '2px 8px', borderRadius: 8, whiteSpace: 'nowrap', fontSize: 16 },
   linea: { margin: 0, fontSize: 19 },
+  // La indicación del cliente tiene que verse de lejos: letra grande y fondo cálido.
+  nota: { display: 'block', marginTop: 3, padding: '4px 10px', borderRadius: 10, background: '#fff3e2', color: '#8a4b00', fontSize: 17, fontWeight: 800 },
   boton: { marginTop: 'auto' },
 }

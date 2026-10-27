@@ -548,6 +548,23 @@ button:disabled {
     anillo 1.3s var(--ease) 380ms 3;
 }
 
+/* Salón: una mesa con el pedido listo late suave en menta hasta que se entrega */
+@keyframes lista {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(76, 175, 120, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(76, 175, 120, 0.3);
+  }
+}
+.mesa-lista,
+.entra.mesa-lista {
+  animation:
+    entra 420ms var(--ease) backwards,
+    lista 2.2s ease-in-out infinite;
+}
+
 /* Cocina: un ticket atrasado "respira" en rosado, sin parpadear como alarma */
 @keyframes urgente {
   0%,
@@ -719,7 +736,8 @@ button:disabled {
   font-size: 14px;
 }
 .aviso-error .aviso-icono,
-.aviso-borrar .aviso-icono {
+.aviso-borrar .aviso-icono,
+.aviso-agotado .aviso-icono {
   background: var(--rosa);
   color: var(--rosa-tinta);
 }
@@ -872,6 +890,10 @@ button:disabled {
 }
 .interruptor input:checked + .interruptor-pista {
   background: #6cc497;
+}
+/* En "Agotados", encendido significa "se acabó": rojo suave en vez de verde */
+.interruptor-alerta input:checked + .interruptor-pista {
+  background: #e98a83;
 }
 .interruptor input:checked + .interruptor-pista .interruptor-bola {
   transform: translateX(20px);

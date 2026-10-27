@@ -2,31 +2,13 @@
 // Todo es "de mejor esfuerzo": si el equipo no soporta algo, simplemente no pasa nada.
 
 // ---------------------------------------------------------------------------------------------
-// Preferencia de sonidos de la interfaz (por equipo). No afecta las alertas de la cocina,
-// que se controlan en "Mesas y ajustes".
-const CLAVE_SONIDOS = 'sonidos-interfaz'
-
-function leerPreferencia() {
-  try {
-    return localStorage.getItem(CLAVE_SONIDOS) !== 'no'
-  } catch {
-    return true
-  }
-}
-
-let sonidosActivos = leerPreferencia()
-
-export function sonidosEncendidos() {
-  return sonidosActivos
-}
-
-export function cambiarSonidos(activo) {
-  sonidosActivos = activo
-  try {
-    localStorage.setItem(CLAVE_SONIDOS, activo ? 'si' : 'no')
-  } catch {
-    // sin almacenamiento: la preferencia dura hasta recargar
-  }
+// Los sonidos de la interfaz siempre están activos (ya no hay botón para silenciarlos).
+// El aviso de la cocina se controla aparte, en "Mesas y ajustes".
+// Se borra la preferencia que pudo quedar guardada de la versión anterior.
+try {
+  localStorage.removeItem('sonidos-interfaz')
+} catch {
+  // sin almacenamiento: no pasa nada
 }
 
 const reducido = () =>
@@ -50,10 +32,43 @@ export function audioCtx() {
   }
 }
 
+const oyentesAudio = new Set()
+
+export function audioDesbloqueado() {
+  return !!ctx && ctx.state === 'running'
+}
+
+// Avisa cuando el audio pasa a estar listo (o se vuelve a bloquear).
+export function escucharAudio(fn) {
+  oyentesAudio.add(fn)
+  return () => oyentesAudio.delete(fn)
+}
+
 if (typeof document !== 'undefined') {
-  const desbloquear = () => audioCtx()
-  document.addEventListener('pointerdown', desbloquear, { once: true, capture: true })
-  document.addEventListener('keydown', desbloquear, { once: true, capture: true })
+  // El navegador solo deja sonar después de un toque de la persona. Cualquier toque en la app
+  // (por ejemplo, el del login) alcanza: se mantiene escuchando hasta que el audio quede activo.
+  const eventos = ['pointerdown', 'touchend', 'click', 'keydown']
+  const desbloquear = () => {
+    try {
+      // iPhone/iPad (Safari 17+): que suene aunque el equipo esté en modo silencio.
+      if (navigator.audioSession) navigator.audioSession.type = 'playback'
+    } catch {
+      // no soportado
+    }
+    const c = audioCtx()
+    if (!c) return
+    c.resume?.().then?.(() => {
+      if (c.state === 'running') {
+        eventos.forEach((e) => document.removeEventListener(e, desbloquear, true))
+        oyentesAudio.forEach((fn) => fn(true))
+      }
+    })
+  }
+  eventos.forEach((e) => document.addEventListener(e, desbloquear, true))
+  // Si la pestaña estuvo en segundo plano, el navegador puede volver a suspender el audio.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && ctx && ctx.state !== 'running') ctx.resume?.()
+  })
 }
 
 // Una nota corta con envolvente suave. `hasta` permite que el tono "caiga", como una burbuja.
@@ -94,6 +109,12 @@ const SONIDOS = {
     nota(c, { f: 830, inicio: 0.08, dur: 0.18, vol: 0.06 })
     nota(c, { f: 988, inicio: 0.16, dur: 0.32, vol: 0.07 })
   },
+  // campanita de tres notas que suben: cocina dejó un pedido listo para retirar
+  listo: (c) => {
+    nota(c, { f: 880, dur: 0.3, vol: 0.1 })
+    nota(c, { f: 1109, inicio: 0.14, dur: 0.3, vol: 0.1 })
+    nota(c, { f: 1319, inicio: 0.28, dur: 0.6, vol: 0.1 })
+  },
   // tono que baja, sin alarma: anular / eliminar
   baja: (c) => nota(c, { f: 440, hasta: 220, dur: 0.18, vol: 0.06 }),
   // dos golpes graves y suaves: algo no se pudo
@@ -104,7 +125,6 @@ const SONIDOS = {
 }
 
 export function sonar(nombre) {
-  if (!sonidosActivos) return
   const c = audioCtx()
   if (!c || !SONIDOS[nombre]) return
   try {
@@ -122,6 +142,7 @@ const PATRONES = {
   toque: 8,
   exito: [12, 70, 18],
   aviso: [18, 50, 18],
+  listo: [14, 70, 14, 70, 32],
   error: [28, 60, 28, 60, 28],
 }
 

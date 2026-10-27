@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './supabase'
 import { formatear } from './moneda'
+import { Cargando, Mensaje, NumeroAnimado } from './ui'
+import { traerTodo } from './consultas'
+import { BotonEstadisticas } from './Estadisticas'
 
 // Mes actual (AAAA-MM) en la zona horaria del restaurante.
 function mesEn(zona) {
@@ -67,34 +70,37 @@ export default function ReporteMensual({ restaurante }) {
     let vigente = true
     setPedidos(null)
     const [desde, hasta] = rangoDelMes(mes)
-    supabase
-      .from('pedidos')
-      .select(
-        'id, dia, total, estado, mesero_id, items_pedido(nombre, cantidad, productos(categorias(tipo))), anulaciones(monto)'
-      )
-      .eq('restaurante_id', restaurante.id)
-      .gte('dia', desde)
-      .lte('dia', hasta)
-      .then(({ data, error }) => {
-        if (!vigente) return
-        if (error) setError(error.message)
-        else {
-          setError('')
-          setPedidos(data)
-        }
-      })
+    // Un mes puede tener más de 1000 cuentas: se lee por tandas para no perder ventas.
+    traerTodo(() =>
+      supabase
+        .from('pedidos')
+        .select('id, dia, total, estado, mesero_id, items_pedido(nombre, cantidad, tipo)')
+        .eq('restaurante_id', restaurante.id)
+        .gte('dia', desde)
+        .lte('dia', hasta)
+        .order('id')
+    ).then(({ data, error }) => {
+      if (!vigente) return
+      if (error) setError(error.message)
+      else {
+        setError('')
+        setPedidos(data)
+      }
+    })
 
     const [desdeAnt, hastaAnt] = rangoDelMes(mesAnterior(mes))
-    supabase
-      .from('pedidos')
-      .select('total')
-      .eq('restaurante_id', restaurante.id)
-      .eq('estado', 'pagado')
-      .gte('dia', desdeAnt)
-      .lte('dia', hastaAnt)
-      .then(({ data }) => {
-        if (vigente) setVendidoMesAnterior((data ?? []).reduce((t, p) => t + Number(p.total), 0))
-      })
+    traerTodo(() =>
+      supabase
+        .from('pedidos')
+        .select('total')
+        .eq('restaurante_id', restaurante.id)
+        .eq('estado', 'pagado')
+        .gte('dia', desdeAnt)
+        .lte('dia', hastaAnt)
+        .order('id')
+    ).then(({ data }) => {
+      if (vigente) setVendidoMesAnterior((data ?? []).reduce((t, p) => t + Number(p.total), 0))
+    })
 
     return () => {
       vigente = false
@@ -126,7 +132,7 @@ export default function ReporteMensual({ restaurante }) {
     const porTipo = { plato: new Map(), postre: new Map(), bebida: new Map(), otro: new Map() }
     pagados.forEach((p) =>
       p.items_pedido.forEach((i) => {
-        const tipo = i.productos?.categorias?.tipo ?? 'otro'
+        const tipo = i.tipo ?? 'otro'
         const m = porTipo[tipo] ?? porTipo.otro
         m.set(i.nombre, (m.get(i.nombre) ?? 0) + i.cantidad)
       })
@@ -145,8 +151,6 @@ export default function ReporteMensual({ restaurante }) {
       meseras.set(nombre(p.mesero_id), m)
     })
 
-    const anulado = pedidos.reduce((t, p) => t + p.anulaciones.reduce((s, a) => s + Number(a.monto), 0), 0)
-
     return {
       vendido,
       cuentas: pagados.length,
@@ -156,8 +160,6 @@ export default function ReporteMensual({ restaurante }) {
       mejorSemana: mejorSemana && { nombre: DIAS_SEMANA[mejorSemana[0]], promedio: mejorSemana[1].total / mejorSemana[1].dias },
       topPorTipo,
       meseras: [...meseras.entries()].sort((a, b) => b[1].total - a[1].total),
-      anulado,
-      anuladoPorcentaje: vendido + anulado > 0 ? (anulado / (vendido + anulado)) * 100 : 0,
     }
   }, [pedidos, nombres])
 
@@ -169,7 +171,7 @@ export default function ReporteMensual({ restaurante }) {
         <h3 style={{ margin: 0 }}>Reporte mensual</h3>
         <input
           type="month"
-          style={s.mes}
+          className="campo-chico"
           value={mes}
           max={mesEn(restaurante.zona_horaria)}
           onChange={(e) => e.target.value && setMes(e.target.value)}
@@ -177,12 +179,16 @@ export default function ReporteMensual({ restaurante }) {
       </div>
       <small style={s.suave}>{nombreMes(mes)}</small>
 
-      {error && <p style={{ color: 'crimson', margin: 0 }}>{error}</p>}
-      {!r && !error && <p>Cargando...</p>}
+      <BotonEstadisticas />
+
+      <Mensaje tipo="error">{error}</Mensaje>
+      {!r && !error && <Cargando filas={3} alto={96} />}
 
       {r && r.cuentas === 0 && (
-        <div style={s.tarjeta}>
-          <p style={{ margin: 0 }}>Este mes todavía no hay ventas cerradas.</p>
+        <div className="vacio aparece">
+          <span className="vacio-icono">📅</span>
+          <b>Este mes todavía no hay ventas cerradas</b>
+          <span>Cuando se cobren cuentas, aquí verás cómo va el mes.</span>
         </div>
       )}
 
@@ -190,9 +196,19 @@ export default function ReporteMensual({ restaurante }) {
         <>
           <div className="aparece" style={s.tarjetaGrande}>
             <small style={s.suaveClaro}>Total vendido en el mes</small>
-            <b style={s.numeroGrande}>{formatear(r.vendido, restaurante)}</b>
+            <b style={s.numeroGrande}>
+              <NumeroAnimado valor={r.vendido} duracion={900} formato={(n) => formatear(n, restaurante)} />
+            </b>
             {cambio != null && (
-              <small style={{ color: cambio >= 0 ? '#9CE6A8' : '#F6B4AF', fontWeight: 700 }}>
+              <small
+                className="infla"
+                style={{
+                  ...s.cambio,
+                  background: cambio >= 0 ? 'rgba(156,230,168,.18)' : 'rgba(246,180,175,.18)',
+                  color: cambio >= 0 ? '#9CE6A8' : '#F6B4AF',
+                  animationDelay: '500ms',
+                }}
+              >
                 {cambio >= 0 ? '▲' : '▼'} {Math.abs(cambio).toFixed(0)}% respecto al mes anterior
               </small>
             )}
@@ -203,14 +219,14 @@ export default function ReporteMensual({ restaurante }) {
 
           <div style={s.grilla}>
             {r.mejorDia && (
-              <div style={s.tarjeta}>
+              <div className="entra" style={{ ...s.tarjeta, animationDelay: '80ms' }}>
                 <small style={s.suave}>🏆 Tu mejor día</small>
                 <b style={{ fontSize: 18 }}>{nombreDia(r.mejorDia.dia)}</b>
                 <span>Vendiste {formatear(r.mejorDia.total, restaurante)}</span>
               </div>
             )}
             {r.mejorSemana && (
-              <div style={s.tarjeta}>
+              <div className="entra" style={{ ...s.tarjeta, animationDelay: '140ms' }}>
                 <small style={s.suave}>📅 Tu mejor día de la semana</small>
                 <b style={{ fontSize: 18 }}>{r.mejorSemana.nombre}</b>
                 <span>En promedio vendes {formatear(r.mejorSemana.promedio, restaurante)}</span>
@@ -223,10 +239,10 @@ export default function ReporteMensual({ restaurante }) {
             <small style={s.suave}>Todavía no hay suficientes ventas para mostrar lo más pedido.</small>
           ) : (
             <div style={s.grilla}>
-              {r.topPorTipo.map(([tipo, lista]) => {
+              {r.topPorTipo.map(([tipo, lista], i) => {
                 const info = TIPOS_INFO[tipo]
                 return (
-                  <div key={tipo} style={s.tarjeta}>
+                  <div key={tipo} className="entra" style={{ ...s.tarjeta, animationDelay: `${200 + i * 60}ms` }}>
                     <small style={s.suave}>
                       {info.icono} {info.titulo}
                     </small>
@@ -245,23 +261,14 @@ export default function ReporteMensual({ restaurante }) {
           </small>
 
           <h4 style={s.titulo}>Por salón</h4>
-          {r.meseras.map(([nombre, m]) => (
-            <div key={nombre} style={s.fila}>
+          {r.meseras.map(([nombre, m], i) => (
+            <div key={nombre} className="entra" style={{ ...s.fila, animationDelay: `${i * 40}ms` }}>
               <span>
                 {nombre} <small style={s.suave}>· {m.cuentas} cuenta(s)</small>
               </span>
               <b>{formatear(m.total, restaurante)}</b>
             </div>
           ))}
-
-          <h4 style={s.titulo}>Anulaciones del mes</h4>
-          <div style={s.fila}>
-            <span>Monto anulado</span>
-            <b style={{ color: r.anulado > 0 ? '#B3261E' : undefined }}>{formatear(r.anulado, restaurante)}</b>
-          </div>
-          {r.anulado > 0 && (
-            <small style={s.suave}>Equivale al {r.anuladoPorcentaje.toFixed(1)}% de lo pedido este mes.</small>
-          )}
         </>
       )}
     </div>
@@ -270,13 +277,22 @@ export default function ReporteMensual({ restaurante }) {
 
 const s = {
   cabecera: { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
-  mes: { padding: 8, fontSize: 15, borderRadius: 8, border: '1px solid #bbb' },
   suave: { color: '#6f6477' },
   suaveClaro: { color: '#e6d9ea' },
   titulo: { margin: '4px 0 2px', fontSize: 16 },
-  tarjeta: { display: 'grid', gap: 4, background: 'white', border: '1px solid #e2dce8', borderRadius: 14, padding: 14 },
-  tarjetaGrande: { display: 'grid', gap: 4, background: '#4B1E4D', color: 'white', borderRadius: 16, padding: 18 },
-  numeroGrande: { fontSize: 32, fontWeight: 800 },
-  grilla: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 },
-  fila: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', border: '1px solid #e2dce8', borderRadius: 12, padding: '10px 12px' },
+  tarjeta: { display: 'grid', gap: 4, alignContent: 'start', background: 'white', border: '1px solid var(--linea)', borderRadius: 18, padding: 14, boxShadow: 'var(--sombra)' },
+  tarjetaGrande: {
+    display: 'grid',
+    gap: 6,
+    justifyItems: 'start',
+    color: 'white',
+    borderRadius: 20,
+    padding: 18,
+    background: 'linear-gradient(135deg, #5c2a5f 0%, #4B1E4D 60%, #3a173c 100%)',
+    boxShadow: '0 16px 34px -20px rgba(75,30,77,.95)',
+  },
+  numeroGrande: { fontSize: 'clamp(28px, 8.5vw, 36px)', fontWeight: 900, lineHeight: 1.1 },
+  cambio: { padding: '3px 10px', borderRadius: 99, fontWeight: 800 },
+  grilla: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))', gap: 12 },
+  fila: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, background: 'white', border: '1px solid var(--linea)', borderRadius: 14, padding: '10px 12px', boxShadow: 'var(--sombra)' },
 }

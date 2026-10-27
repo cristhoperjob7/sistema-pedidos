@@ -65,7 +65,7 @@ export function Mensaje({ tipo = 'ok', children }) {
 
 // ---------------------------------------------------------------------------------------------
 // Avisos flotantes: píldoras que bajan desde arriba y se van solas. Se monta una vez en App.
-const ICONOS = { ok: '✓', error: '⚠️', info: '•', cocina: '🍳', cobro: '💸', borrar: '🗑️' }
+const ICONOS = { ok: '✓', error: '⚠️', info: '•', cocina: '🍳', cobro: '💸', borrar: '🗑️', agotado: '🚫', listo: '🔔' }
 
 export function Avisos() {
   const [lista, setLista] = useState([])
@@ -148,9 +148,9 @@ export function NumeroAnimado({ valor, formato = (n) => String(Math.round(n)), d
 
 // ---------------------------------------------------------------------------------------------
 // Interruptor tipo iPhone (en vez de una casilla), con "clic" táctil y sonoro.
-export function Interruptor({ checked, onChange, children, disabled }) {
+export function Interruptor({ checked, onChange, children, disabled, alerta = false }) {
   return (
-    <label className={`interruptor${disabled ? ' deshabilitado' : ''}`}>
+    <label className={`interruptor${alerta ? ' interruptor-alerta' : ''}${disabled ? ' deshabilitado' : ''}`}>
       <input
         type="checkbox"
         role="switch"

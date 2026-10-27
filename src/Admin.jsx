@@ -95,7 +95,7 @@ export default function Admin({ restaurante, scrollAlAbrir = false, conPedidos =
           mostrarse, el fundido se repite solo (sin mover nada: la barra fija de Pedidos no salta). */}
       {conPedidos && (
         <div className="funde" style={{ display: tab === 'pedidos' ? 'block' : 'none' }}>
-          <Mesera restaurante={restaurante} />
+          <Mesera restaurante={restaurante} rol="admin" />
         </div>
       )}
       {conPedidos && (

@@ -4,9 +4,10 @@ import Superadmin from './Superadmin'
 import Admin from './Admin'
 import Mesera from './Mesera'
 import Cocina from './Cocina'
+import Estadisticas from './Estadisticas'
 import Login, { NuevaClave, MARCA } from './Login'
 import { Avisos, Cargando } from './ui'
-import { cambiarSonidos, sentir, sonidosEncendidos } from './feedback'
+import { sentir } from './feedback'
 
 // Lee lo que Supabase deja en la dirección al volver del correo de recuperación.
 function leerEnlace() {
@@ -80,7 +81,23 @@ function Panel({ sesion }) {
   const [perfil, setPerfil] = useState(null)
   const [membresias, setMembresias] = useState([])
   const [error, setError] = useState('')
-  const [sonidos, setSonidos] = useState(sonidosEncendidos)
+  const [ruta, setRuta] = useState(() => window.location.hash) // "#/estadisticas" abre la página de estadísticas
+
+  useEffect(() => {
+    const alCambiar = () => setRuta(window.location.hash)
+    window.addEventListener('hashchange', alCambiar)
+    return () => window.removeEventListener('hashchange', alCambiar)
+  }, [])
+
+  // Si la página se abrió en una pestaña aparte, se cierra; si no se puede, se vuelve al panel.
+  function volverDeEstadisticas() {
+    sentir('toque')
+    window.close()
+    setTimeout(() => {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search)
+      setRuta('')
+    }, 150)
+  }
 
   useEffect(() => {
     async function cargar() {
@@ -109,13 +126,6 @@ function Panel({ sesion }) {
       ? `${miembro.restaurantes.nombre} · ${ROL_TEXTO[miembro.rol] ?? ''}`
       : ''
 
-  function alternarSonidos() {
-    const nuevo = !sonidos
-    cambiarSonidos(nuevo)
-    setSonidos(nuevo)
-    sentir('toque', nuevo ? 'tic' : undefined)
-  }
-
   return (
     <div>
       <header style={estilos.header}>
@@ -127,17 +137,6 @@ function Panel({ sesion }) {
             <b style={estilos.marca}>{perfil ? perfil.nombre : MARCA}</b>
             <small style={estilos.sub}>{perfil ? subtitulo || MARCA : ' '}</small>
           </div>
-          <button
-            className="btn btn-chico"
-            style={estilos.icono}
-            onClick={alternarSonidos}
-            aria-label={sonidos ? 'Silenciar sonidos de la app' : 'Activar sonidos de la app'}
-            title={sonidos ? 'Sonidos activados' : 'Sonidos silenciados'}
-          >
-            <span key={String(sonidos)} className="contador-pop">
-              {sonidos ? '🔊' : '🔇'}
-            </span>
-          </button>
           <button
             className="btn btn-chico"
             style={estilos.salir}
@@ -169,7 +168,13 @@ function Panel({ sesion }) {
           </div>
         )}
 
-        {miembro && (
+        {miembro && miembro.rol === 'admin' && ruta === '#/estadisticas' && (
+          <div className="aparece">
+            <Estadisticas restaurante={miembro.restaurantes} onVolver={volverDeEstadisticas} />
+          </div>
+        )}
+
+        {miembro && !(miembro.rol === 'admin' && ruta === '#/estadisticas') && (
           <div className="aparece">
             {miembro.rol === 'admin' && <Admin restaurante={miembro.restaurantes} conPedidos />}
             {miembro.rol === 'mesera' && <Mesera restaurante={miembro.restaurantes} />}
@@ -228,7 +233,6 @@ const estilos = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
   },
-  icono: { background: 'rgba(255,255,255,.14)', color: 'white', minWidth: 40, padding: '6px 8px', flex: 'none' },
   salir: { background: 'rgba(255,255,255,.14)', color: 'white', flex: 'none' },
   main: { maxWidth: 1100, margin: '0 auto', padding: '16px 16px 32px' },
 }

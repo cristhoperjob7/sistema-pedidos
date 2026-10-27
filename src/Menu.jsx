@@ -20,6 +20,8 @@ export default function Menu({ restaurante }) {
   const [nuevaCat, setNuevaCat] = useState({ nombre: '', va_a_cocina: true, tipo: 'plato' })
   const [nuevos, setNuevos] = useState({}) // { [categoriaId]: { nombre, precio } }
   const [mostrarCat, setMostrarCat] = useState(false)
+  const [confCat, setConfCat] = useState(null) // id de la categoría que se está por eliminar
+  const [eliminando, setEliminando] = useState(false)
 
   async function cargar() {
     const c = await supabase.from('categorias').select('*').eq('restaurante_id', restaurante.id).order('orden')
@@ -110,7 +112,29 @@ export default function Menu({ restaurante }) {
   async function cambiarTipo(c, valor) {
     sentir('toque', 'tic')
     const ok = await actualizar('categorias', c.id, { tipo: valor })
-    if (ok) avisar('Tipo guardado')
+    if (!ok) return
+    // Cada venta guarda su propia copia del tipo: se corrige también en las ventas ya hechas de esta categoría,
+    // para que los reportes queden bien aunque el tipo estuviera mal puesto antes.
+    const { data: prods } = await supabase.from('productos').select('id').eq('categoria_id', c.id)
+    if (prods?.length) {
+      await supabase.from('items_pedido').update({ tipo: valor }).in('producto_id', prods.map((p) => p.id))
+    }
+    avisar('Tipo guardado')
+  }
+
+  async function eliminarCategoria(c, cuantos) {
+    setError('')
+    sentir('aviso')
+    setEliminando(true)
+    // Los productos de la categoría se borran con ella (cascada en la base). Las ventas ya hechas
+    // se conservan: cada una guarda su propia copia del nombre y del precio.
+    const { error } = await supabase.from('categorias').delete().eq('id', c.id)
+    setEliminando(false)
+    if (error) return setError(error.message)
+    setConfCat(null)
+    sonar('baja')
+    avisar(cuantos ? `"${c.nombre}" y sus ${cuantos} productos eliminados` : `"${c.nombre}" eliminada`, 'borrar')
+    cargar()
   }
 
   async function alternarActivo(tabla, item) {
@@ -174,10 +198,50 @@ export default function Menu({ restaurante }) {
               <Interruptor checked={c.va_a_cocina} onChange={(v) => cambiarCocina(c, v)}>
                 Va a cocina
               </Interruptor>
-              <button className="btn btn-chico btn-sec" style={{ marginLeft: 'auto' }} onClick={() => alternarActivo('categorias', c)}>
-                {c.activo ? 'Desactivar' : 'Activar'}
-              </button>
+              <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
+                <button className="btn btn-chico btn-sec" onClick={() => alternarActivo('categorias', c)}>
+                  {c.activo ? 'Desactivar' : 'Activar'}
+                </button>
+                <button
+                  className="btn btn-chico btn-peligro-suave"
+                  aria-expanded={confCat === c.id}
+                  onClick={() => {
+                    sentir('toque')
+                    setConfCat(confCat === c.id ? null : c.id)
+                  }}
+                >
+                  Eliminar
+                </button>
+              </div>
             </div>
+
+            <Desplegable abierto={confCat === c.id}>
+              <div style={s.confirmar}>
+                <b style={{ color: '#B3261E' }}>
+                  ¿Eliminar la categoría “{c.nombre}”?
+                </b>
+                <small>
+                  {lista.length > 0
+                    ? `Se borran también sus ${lista.length} producto${lista.length === 1 ? '' : 's'}. `
+                    : ''}
+                  Las ventas ya hechas se conservan, pero en el reporte mensual aparecerán como “Otros”. No se puede
+                  deshacer. Si solo quieres que no se pueda pedir por ahora, usa “Desactivar”.
+                </small>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button className="btn btn-sec" style={{ flex: 1 }} disabled={eliminando} onClick={() => setConfCat(null)}>
+                    No, dejarla
+                  </button>
+                  <button
+                    className="btn btn-peligro"
+                    style={{ flex: 1 }}
+                    disabled={eliminando}
+                    onClick={() => eliminarCategoria(c, lista.length)}
+                  >
+                    {eliminando ? <span className="puntos">Eliminando</span> : 'Sí, eliminar'}
+                  </button>
+                </div>
+              </div>
+            </Desplegable>
 
             {lista.length === 0 && <small className="suave">Sin productos todavía.</small>}
             {lista.map((p) => (
@@ -292,6 +356,7 @@ const s = {
     border: '1px solid var(--linea)',
     transition: 'opacity 220ms var(--ease)',
   },
+  confirmar: { display: 'grid', gap: 10, padding: 12, borderRadius: 14, background: 'var(--rosa)', border: '1px solid #f3c9c5' },
   nuevo: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', padding: 8, borderRadius: 14, border: '1.5px dashed var(--lavanda-2)' },
   precio: { display: 'flex', alignItems: 'center', gap: 4 },
 }
