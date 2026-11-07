@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import Campo from './Campo'
-import { Cargando, Desplegable, Interruptor, Mensaje } from './ui'
+import { Cargando, Desplegable, Interruptor, Mensaje, Confirmar } from './ui'
 import { avisar, sentir, sonar, vibrar } from './feedback'
 
 // Mesas, métodos de pago y ajustes de cocina de un restaurante.
@@ -173,45 +173,36 @@ export default function Local({ restaurante }) {
                 Activar
               </button>
             )}
-            {confMesa === m.id ? (
-              <span className="infla" style={{ display: 'flex', gap: 6 }}>
-                <button className="btn btn-chico btn-peligro" onClick={() => eliminarMesas(m)}>
-                  Sí, eliminar
-                </button>
-                <button className="btn btn-chico btn-sec" onClick={() => setConfMesa(null)}>
-                  No
-                </button>
-              </span>
-            ) : (
-              <button className="btn btn-chico btn-peligro-suave" onClick={() => pedirConfirmacion(m.id)}>
-                Eliminar
-              </button>
-            )}
+            <button className="btn btn-chico btn-peligro-suave" onClick={() => pedirConfirmacion(m.id)}>
+              Eliminar
+            </button>
           </div>
         ))}
         <div style={s.fila}>
           <button className="btn btn-principal" style={{ flex: '1 1 180px' }} disabled={agregando} onClick={agregarMesa}>
             {agregando ? <span className="puntos">Agregando</span> : `+ Agregar mesa ${siguienteMesa}`}
           </button>
-          {mesas.length > 1 && confMesa !== 'todas' && (
+          {mesas.length > 1 && (
             <button className="btn btn-peligro-suave" onClick={() => pedirConfirmacion('todas')}>
               Eliminar todas
             </button>
           )}
         </div>
-        <Desplegable abierto={mesas.length > 1 && confMesa === 'todas'}>
-          <div style={s.confirmar}>
-            <b>¿Eliminar las {mesas.length} mesas?</b>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn btn-sec" style={{ flex: 1 }} onClick={() => setConfMesa(null)}>
-                No
-              </button>
-              <button className="btn btn-peligro" style={{ flex: 1 }} onClick={() => eliminarMesas(null)}>
-                Sí, eliminar todas
-              </button>
-            </div>
-          </div>
-        </Desplegable>
+        <Confirmar
+          abierto={confMesa === 'todas' && mesas.length > 1}
+          titulo={`¿Eliminar las ${mesas.length} mesas?`}
+          texto="Las ventas ya hechas se conservan. No se pueden eliminar mesas que tengan una cuenta abierta."
+          textoConfirmar="Sí, eliminar todas"
+          onCancelar={() => setConfMesa(null)}
+          onConfirmar={() => eliminarMesas(null)}
+        />
+        <Confirmar
+          abierto={!!confMesa && confMesa !== 'todas' && mesas.some((x) => x.id === confMesa)}
+          titulo={`¿Eliminar la mesa ${mesas.find((x) => x.id === confMesa)?.numero ?? ''}?`}
+          texto="Las ventas ya hechas con esta mesa se conservan."
+          onCancelar={() => setConfMesa(null)}
+          onConfirmar={() => eliminarMesas(mesas.find((x) => x.id === confMesa))}
+        />
       </section>
 
       <section className="tarjeta" style={s.caja}>
@@ -252,7 +243,7 @@ export default function Local({ restaurante }) {
           <h3 style={{ margin: 0 }}>Pantalla de cocina</h3>
           <label style={s.etiqueta}>
             <span style={{ flex: '1 1 200px' }}>
-              <span style={{ ...s.puntoColor, background: '#f6c95b' }} /> El ticket se pone amarillo a los (minutos)
+              <span style={{ ...s.puntoColor, background: 'var(--aviso-tinta)' }} /> El ticket se pone amarillo a los (minutos)
             </span>
             <Campo
               className="campo-chico"
@@ -264,7 +255,7 @@ export default function Local({ restaurante }) {
           </label>
           <label style={s.etiqueta}>
             <span style={{ flex: '1 1 200px' }}>
-              <span style={{ ...s.puntoColor, background: '#e98a83' }} /> El ticket se pone rojo a los (minutos)
+              <span style={{ ...s.puntoColor, background: 'var(--rosa-tinta)' }} /> El ticket se pone rojo a los (minutos)
             </span>
             <Campo
               className="campo-chico"
@@ -305,7 +296,7 @@ const s = {
     fontWeight: 900,
   },
   nuevo: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', padding: 8, borderRadius: 14, border: '1.5px dashed var(--lavanda-2)' },
-  confirmar: { display: 'grid', gap: 10, padding: 12, borderRadius: 14, background: 'var(--rosa)', border: '1px solid #f3c9c5' },
+  confirmar: { display: 'grid', gap: 10, padding: 12, borderRadius: 14, background: 'var(--rosa)', border: '1px solid var(--borde-rosa)' },
   etiqueta: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', fontSize: 15 },
   puntoColor: { display: 'inline-block', width: 10, height: 10, borderRadius: '50%', marginRight: 4 },
 }

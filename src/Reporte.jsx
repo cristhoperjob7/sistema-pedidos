@@ -41,7 +41,7 @@ export default function Reporte({ restaurante }) {
     supabase
       .from('pedidos')
       .select(
-        'id, numero, total, estado, mesero_id, mesa_numero, metodos_pago(nombre), items_pedido(nombre, cantidad, tipo)'
+        'id, numero, total, propina, estado, mesero_id, mesa_numero, metodos_pago(nombre), items_pedido(nombre, cantidad, tipo)'
       )
       .eq('restaurante_id', restaurante.id)
       .eq('dia', dia)
@@ -70,6 +70,7 @@ export default function Reporte({ restaurante }) {
     const nombre = (id) => nombres[id] ?? 'Sin asignar'
     const pagados = pedidos.filter((p) => p.estado === 'pagado')
     const vendido = pagados.reduce((t, p) => t + Number(p.total), 0)
+    const propinas = pagados.reduce((t, p) => t + Number(p.propina ?? 0), 0)
 
     const porTipo = { plato: new Map(), postre: new Map(), bebida: new Map(), otro: new Map() }
     const pagos = new Map()
@@ -90,6 +91,7 @@ export default function Reporte({ restaurante }) {
 
     return {
       vendido,
+      propinas,
       cuentas: pagados.length,
       ticketPromedio: pagados.length ? vendido / pagados.length : 0,
       abiertas: pedidos.filter((p) => p.estado === 'abierto').length,
@@ -149,6 +151,14 @@ export default function Reporte({ restaurante }) {
                 <NumeroAnimado valor={r.cuentas} />
               </b>
             </div>
+            {r.propinas > 0 && (
+              <div style={s.kpi}>
+                <small style={s.suave}>Propinas (aparte de lo vendido)</small>
+                <b style={s.kpiValor}>
+                  <NumeroAnimado valor={r.propinas} formato={(n) => formatear(n, restaurante)} />
+                </b>
+              </div>
+            )}
             <div style={s.kpi}>
               <small style={s.suave}>Ticket promedio</small>
               <b style={s.kpiValor}>
@@ -227,21 +237,20 @@ const s = {
   cabecera: { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
   gira: { display: 'inline-block', animation: 'gira 600ms var(--resorte)' },
   kpis: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px, 100%), 1fr))', gap: 12 },
-  kpi: { background: 'white', border: '1px solid var(--linea)', borderRadius: 18, padding: 14, display: 'grid', gap: 2, boxShadow: 'var(--sombra)' },
+  kpi: { background: 'var(--sup)', border: '1px solid var(--linea)', borderRadius: 18, padding: 14, display: 'grid', gap: 2, boxShadow: 'var(--sombra)' },
   kpiPrincipal: {
     gridColumn: '1 / -1',
-    color: 'white',
-    border: 'none',
-    background: 'linear-gradient(135deg, #5c2a5f 0%, #4B1E4D 60%, #3a173c 100%)',
-    boxShadow: '0 14px 30px -18px rgba(75,30,77,.9)',
+    color: 'var(--tinta)',
+    background: 'linear-gradient(135deg, color-mix(in srgb, var(--marca) 30%, var(--sup)) 0%, var(--sup) 100%)',
+    boxShadow: 'var(--sombra)',
   },
   kpiValor: { fontSize: 'clamp(22px, 6vw, 26px)', fontWeight: 900 },
-  suave: { color: '#6f6477' },
+  suave: { color: 'var(--suave)' },
   titulo: { margin: '12px 0 2px', fontSize: 16 },
   barras: { display: 'grid', gap: 10, borderRadius: 16 },
   barra: { display: 'flex', alignItems: 'center', gap: 10 },
   barraNombre: { width: '38%', flex: 'none', fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   pista: { flex: 1, height: 12, borderRadius: 99, background: 'var(--lavanda)', overflow: 'hidden' },
-  relleno: { display: 'block', height: '100%', borderRadius: 99, background: 'linear-gradient(90deg, #FFC23D, #F2A900)' },
-  fila: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, background: 'white', border: '1px solid var(--linea)', borderRadius: 14, padding: '10px 12px', boxShadow: 'var(--sombra)' },
+  relleno: { display: 'block', height: '100%', borderRadius: 99, background: 'var(--marca)' },
+  fila: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, background: 'var(--sup)', border: '1px solid var(--linea)', borderRadius: 14, padding: '10px 12px', boxShadow: 'var(--sombra)' },
 }

@@ -1,3 +1,8 @@
+import { BotonTema } from './tema'
+import Icono from './iconos'
+import Agotados from './Agotados'
+import { aplicarColores, quitarColores } from './paletas'
+import Bienvenida, { guiaYaVista, marcarGuiaVista } from './Bienvenida'
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import Superadmin from './Superadmin'
@@ -77,10 +82,19 @@ export default function App() {
 
 const ROL_TEXTO = { admin: 'Administración', mesera: 'Salón', cocina: 'Cocina' }
 
+// Cada perfil tiene su propio ícono y color en la cabecera, para distinguirlos de un vistazo.
+const ICONO_PERFIL = {
+  superadmin: { icono: 'escudo', fondo: '#a978ff', texto: 'Superadmin' },
+  admin: { icono: 'maletin', fondo: 'var(--marca)', texto: 'Administración' },
+  mesera: { icono: 'campana', fondo: 'var(--menta-tinta)', texto: 'Salón' },
+  cocina: { icono: 'gorro', fondo: 'var(--aviso-tinta)', texto: 'Cocina' },
+}
+
 function Panel({ sesion }) {
   const [perfil, setPerfil] = useState(null)
   const [membresias, setMembresias] = useState([])
   const [error, setError] = useState('')
+  const [guia, setGuia] = useState(false)
   const [ruta, setRuta] = useState(() => window.location.hash) // "#/estadisticas" abre la página de estadísticas
 
   useEffect(() => {
@@ -110,7 +124,7 @@ function Panel({ sesion }) {
 
       const m = await supabase
         .from('miembros')
-        .select('*, restaurantes(id, nombre, slug, moneda_codigo, moneda_simbolo, moneda_decimales, zona_horaria)')
+        .select('*, restaurantes(id, nombre, slug, moneda_codigo, moneda_simbolo, moneda_decimales, zona_horaria, color_marca, color_fondo)')
         .eq('usuario_id', sesion.user.id)
         .eq('activo', true)
       if (m.error) setError(m.error.message)
@@ -120,6 +134,23 @@ function Panel({ sesion }) {
   }, [sesion])
 
   const miembro = membresias[0]
+
+  // Colores del restaurante (los elige el superadmin). Al salir vuelven los del sistema; el login nunca cambia.
+  const rest = membresias[0]?.restaurantes
+  useEffect(() => {
+    aplicarColores(rest)
+    return () => quitarColores()
+  }, [rest?.id, rest?.color_marca, rest?.color_fondo])
+
+  // Primera vez que entra: se muestra la guía de su perfil (una sola vez por cuenta).
+  useEffect(() => {
+    if (miembro && !perfil?.es_superadmin && !guiaYaVista(sesion)) setGuia(true)
+  }, [miembro, perfil, sesion])
+  function cerrarGuia() {
+    setGuia(false)
+    marcarGuiaVista(sesion)
+  }
+  const clavePerfil = perfil?.es_superadmin ? 'superadmin' : (ICONO_PERFIL[miembro?.rol] ? miembro.rol : 'admin')
   const subtitulo = perfil?.es_superadmin
     ? 'Superadmin'
     : miembro
@@ -130,13 +161,26 @@ function Panel({ sesion }) {
     <div>
       <header style={estilos.header}>
         <div style={estilos.headerInterior}>
-          <span style={estilos.logo} aria-hidden="true">
-            🍽️
+          <span
+            style={{ ...estilos.logo, background: ICONO_PERFIL[clavePerfil].fondo }}
+            title={ICONO_PERFIL[clavePerfil].texto}
+            aria-hidden="true"
+          >
+            <Icono n={ICONO_PERFIL[clavePerfil].icono} tam={22} />
           </span>
           <div style={{ minWidth: 0, flex: 1 }}>
             <b style={estilos.marca}>{perfil ? perfil.nombre : MARCA}</b>
             <small style={estilos.sub}>{perfil ? subtitulo || MARCA : ' '}</small>
           </div>
+          {miembro && ['admin', 'mesera', 'cocina'].includes(miembro.rol) && (
+            <Agotados restaurante={miembro.restaurantes} soloPlatos={miembro.rol === 'cocina'} />
+          )}
+          {miembro && !perfil?.es_superadmin && (
+            <button className="btn btn-chico btn-sec" style={{ width: 40, padding: 0, flex: 'none' }} aria-label="Ayuda: ver la guía" title="Ayuda" onClick={() => { sentir('toque'); setGuia(true) }}>
+              <Icono n="ayuda" tam={18} />
+            </button>
+          )}
+          <BotonTema />
           <button
             className="btn btn-chico"
             style={estilos.salir}
@@ -149,6 +193,7 @@ function Panel({ sesion }) {
           </button>
         </div>
       </header>
+      {guia && miembro && <Bienvenida rol={miembro.rol} onCerrar={cerrarGuia} />}
       <main style={estilos.main}>
         {error && <p className="msj msj-error">Error: {error}</p>}
 
@@ -192,12 +237,12 @@ const estilos = {
     position: 'sticky',
     top: 0,
     zIndex: 50,
-    background: 'linear-gradient(135deg, rgba(92,42,95,.96) 0%, rgba(75,30,77,.96) 100%)',
-    WebkitBackdropFilter: 'blur(12px)',
-    backdropFilter: 'blur(12px)',
-    color: 'white',
+    background: 'color-mix(in srgb, var(--sup) 90%, transparent)',
+    WebkitBackdropFilter: 'blur(14px)',
+    backdropFilter: 'blur(14px)',
+    color: 'var(--tinta)',
     paddingTop: 'var(--seguro-arriba)',
-    boxShadow: '0 6px 20px -12px rgba(43,16,45,.6)',
+    borderBottom: '1px solid var(--linea)',
   },
   headerInterior: {
     maxWidth: 1100,
@@ -214,7 +259,8 @@ const estilos = {
     width: 38,
     height: 38,
     borderRadius: 12,
-    background: 'linear-gradient(180deg, #FFC23D, #F2A900)',
+    background: 'var(--marca)',
+    color: '#0b1020',
     fontSize: 19,
   },
   marca: {
@@ -233,6 +279,6 @@ const estilos = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
   },
-  salir: { background: 'rgba(255,255,255,.14)', color: 'white', flex: 'none' },
+  salir: { background: 'var(--lavanda)', color: 'var(--tinta)', border: '1px solid var(--linea)', flex: 'none' },
   main: { maxWidth: 1100, margin: '0 auto', padding: '16px 16px 32px' },
 }

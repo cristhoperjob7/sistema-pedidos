@@ -204,8 +204,8 @@ export default function ReporteMensual({ restaurante }) {
                 className="infla"
                 style={{
                   ...s.cambio,
-                  background: cambio >= 0 ? 'rgba(156,230,168,.18)' : 'rgba(246,180,175,.18)',
-                  color: cambio >= 0 ? '#9CE6A8' : '#F6B4AF',
+                  background: cambio >= 0 ? 'color-mix(in srgb, var(--menta-tinta) 18%, transparent)' : 'color-mix(in srgb, var(--rosa-tinta) 18%, transparent)',
+                  color: cambio >= 0 ? 'var(--menta-tinta)' : 'var(--rosa-tinta)',
                   animationDelay: '500ms',
                 }}
               >
@@ -277,22 +277,22 @@ export default function ReporteMensual({ restaurante }) {
 
 const s = {
   cabecera: { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
-  suave: { color: '#6f6477' },
-  suaveClaro: { color: '#e6d9ea' },
+  suave: { color: 'var(--suave)' },
+  suaveClaro: { color: 'var(--suave)' },
   titulo: { margin: '4px 0 2px', fontSize: 16 },
-  tarjeta: { display: 'grid', gap: 4, alignContent: 'start', background: 'white', border: '1px solid var(--linea)', borderRadius: 18, padding: 14, boxShadow: 'var(--sombra)' },
+  tarjeta: { display: 'grid', gap: 4, alignContent: 'start', background: 'var(--sup)', border: '1px solid var(--linea)', borderRadius: 18, padding: 14, boxShadow: 'var(--sombra)' },
   tarjetaGrande: {
     display: 'grid',
     gap: 6,
     justifyItems: 'start',
-    color: 'white',
+    color: 'var(--tinta)',
     borderRadius: 20,
     padding: 18,
-    background: 'linear-gradient(135deg, #5c2a5f 0%, #4B1E4D 60%, #3a173c 100%)',
-    boxShadow: '0 16px 34px -20px rgba(75,30,77,.95)',
+    background: 'linear-gradient(135deg, color-mix(in srgb, var(--marca) 30%, var(--sup)) 0%, var(--sup) 100%)',
+    boxShadow: 'var(--sombra)',
   },
   numeroGrande: { fontSize: 'clamp(28px, 8.5vw, 36px)', fontWeight: 900, lineHeight: 1.1 },
   cambio: { padding: '3px 10px', borderRadius: 99, fontWeight: 800 },
   grilla: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))', gap: 12 },
-  fila: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, background: 'white', border: '1px solid var(--linea)', borderRadius: 14, padding: '10px 12px', boxShadow: 'var(--sombra)' },
+  fila: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, background: 'var(--sup)', border: '1px solid var(--linea)', borderRadius: 14, padding: '10px 12px', boxShadow: 'var(--sombra)' },
 }

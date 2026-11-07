@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { escucharAvisos, movimientoReducido, sentir } from './feedback'
 
 // Duración de abrir/cerrar paneles. Debe coincidir con --dur-panel en index.css.
@@ -194,5 +195,64 @@ export function Segmento({ opciones, valor, onChange, oscuro = false, etiqueta }
         </button>
       ))}
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------------------------
+// Confirmar: ventana flotante en el centro para confirmar algo delicado (eliminar, anular, cerrar…).
+// En vez de abrir un recuadro más abajo en la pantalla. Se cierra con "Cancelar", con Esc o tocando fuera
+// (nunca mientras está trabajando). "children" permite agregar campos (ej. escribir el nombre).
+export function Confirmar({
+  abierto,
+  titulo,
+  texto,
+  children,
+  textoConfirmar = 'Sí, eliminar',
+  textoCancelar = 'Cancelar',
+  peligro = true,
+  trabajando = false,
+  bloqueado = false,
+  error = '',
+  onConfirmar,
+  onCancelar,
+}) {
+  useEffect(() => {
+    if (!abierto) return
+    const tecla = (e) => e.key === 'Escape' && !trabajando && onCancelar()
+    window.addEventListener('keydown', tecla)
+    return () => window.removeEventListener('keydown', tecla)
+  }, [abierto, trabajando, onCancelar])
+
+  if (!abierto) return null
+  return createPortal(
+    <div className="hoja-velo funde" style={{ alignItems: 'center', padding: 16, zIndex: 95 }} onClick={() => !trabajando && onCancelar()}>
+      <div
+        className="hoja sube"
+        role="alertdialog"
+        aria-modal="true"
+        aria-label={titulo}
+        onClick={(e) => e.stopPropagation()}
+        style={{ display: 'grid', gap: 12, padding: 20, maxWidth: 420, borderRadius: 24, borderBottom: '1px solid var(--linea)', overflowY: 'auto' }}
+      >
+        <b style={{ fontSize: 19, lineHeight: 1.25, color: peligro ? 'var(--rosa-tinta)' : 'var(--tinta)' }}>{titulo}</b>
+        {texto && <div className="suave" style={{ fontSize: 15, lineHeight: 1.45 }}>{texto}</div>}
+        {children}
+        {error && <Mensaje tipo="error">{error}</Mensaje>}
+        <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+          <button className="btn btn-sec" style={{ flex: 1 }} autoFocus disabled={trabajando} onClick={onCancelar}>
+            {textoCancelar}
+          </button>
+          <button
+            className={`btn ${peligro ? 'btn-peligro' : 'btn-principal'}`}
+            style={{ flex: 1.4 }}
+            disabled={trabajando || bloqueado}
+            onClick={onConfirmar}
+          >
+            {trabajando ? <span className="puntos">Un momento</span> : textoConfirmar}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
   )
 }

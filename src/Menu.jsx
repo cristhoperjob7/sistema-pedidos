@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import { formatear, leerPrecio, soloPrecio } from './moneda'
-import { Cargando, Desplegable, Interruptor, Mensaje } from './ui'
+import Icono from './iconos'
+import { Cargando, Desplegable, Interruptor, Mensaje, Confirmar } from './ui'
 import { avisar, sentir, sonar, vibrar } from './feedback'
 
 // Sirve solo para el reporte mensual (separar "platos más vendidos" de "postres favoritos").
@@ -180,7 +181,7 @@ export default function Menu({ restaurante }) {
       <div>
         <h3 style={{ margin: 0 }}>Menú de {restaurante.nombre}</h3>
         <small className="suave">
-          Precios en {restaurante.moneda_codigo} ({restaurante.moneda_simbolo}). Usa «Editar» o el lápiz ✏️ para cambiar algo.
+          Precios en {restaurante.moneda_codigo} ({restaurante.moneda_simbolo}). Usa «Editar» o el lápiz para cambiar algo.
         </small>
       </div>
 
@@ -259,7 +260,7 @@ export default function Menu({ restaurante }) {
                       })
                     }}
                   >
-                    ✏️
+                    <Icono n="lapiz" tam={17} />
                   </button>
                   <button
                     className="btn btn-chico btn-peligro-suave"
@@ -272,24 +273,17 @@ export default function Menu({ restaurante }) {
                       setConfProd(confProd === p.id ? null : p.id)
                     }}
                   >
-                    🗑️
+                    <Icono n="basura" tam={17} />
                   </button>
                 </>
               )}
-              <Desplegable abierto={confProd === p.id}>
-                <div style={{ ...s.confirmar, marginTop: 4 }}>
-                  <b style={{ color: '#B3261E' }}>¿Eliminar “{p.nombre}”?</b>
-                  <small>Las ventas ya hechas se conservan. Si solo quieres ocultarlo, edítalo y desmarca “Disponible”.</small>
-                  <div style={s.fila}>
-                    <button className="btn btn-sec" style={{ flex: 1 }} onClick={() => setConfProd(null)}>
-                      No
-                    </button>
-                    <button className="btn btn-peligro" style={{ flex: 1 }} onClick={() => eliminarProducto(p)}>
-                      Sí, eliminar
-                    </button>
-                  </div>
-                </div>
-              </Desplegable>
+              <Confirmar
+                abierto={confProd === p.id}
+                titulo={`¿Eliminar “${p.nombre}”?`}
+                texto="Las ventas ya hechas se conservan. Si solo quieres ocultarlo, edítalo y desmarca “Disponible”."
+                onCancelar={() => setConfProd(null)}
+                onConfirmar={() => eliminarProducto(p)}
+              />
             </div>
           )
         }
@@ -376,31 +370,15 @@ export default function Menu({ restaurante }) {
               </div>
             </Desplegable>
 
-            <Desplegable abierto={confCat === c.id}>
-              <div style={s.confirmar}>
-                <b style={{ color: '#B3261E' }}>¿Eliminar la categoría “{c.nombre}”?</b>
-                <small>
-                  {lista.length > 0
-                    ? `Se borran también sus ${lista.length} producto${lista.length === 1 ? '' : 's'}. `
-                    : ''}
-                  Las ventas ya hechas se conservan, pero en el reporte mensual aparecerán como “Otros”. No se puede
-                  deshacer. Si solo quieres que no se pueda pedir por ahora, desmarca “Activa”.
-                </small>
-                <div style={s.fila}>
-                  <button className="btn btn-sec" style={{ flex: 1 }} disabled={eliminando} onClick={() => setConfCat(null)}>
-                    No, dejarla
-                  </button>
-                  <button
-                    className="btn btn-peligro"
-                    style={{ flex: 1 }}
-                    disabled={eliminando}
-                    onClick={() => eliminarCategoria(c, lista.length)}
-                  >
-                    {eliminando ? <span className="puntos">Eliminando</span> : 'Sí, eliminar'}
-                  </button>
-                </div>
-              </div>
-            </Desplegable>
+            <Confirmar
+              abierto={confCat === c.id}
+              titulo={`¿Eliminar la categoría “${c.nombre}”?`}
+              texto={`${lista.length > 0 ? `Se borran también sus ${lista.length} producto${lista.length === 1 ? '' : 's'}. ` : ''}Las ventas ya hechas se conservan, pero en el reporte mensual aparecerán como “Otros”. No se puede deshacer. Si solo quieres que no se pueda pedir por ahora, desmarca “Activa”.`}
+              textoConfirmar="Sí, eliminar"
+              trabajando={eliminando}
+              onCancelar={() => setConfCat(null)}
+              onConfirmar={() => eliminarCategoria(c, lista.length)}
+            />
 
             {lista.length === 0 && <small className="suave">Sin productos todavía.</small>}
             {lista.length > 0 && fila(lista[0])}
@@ -515,11 +493,11 @@ const s = {
     alignItems: 'center',
     padding: 8,
     borderRadius: 14,
-    background: '#fcfafd',
+    background: 'var(--lavanda)',
     border: '1px solid var(--linea)',
     transition: 'opacity 220ms var(--ease)',
   },
-  confirmar: { display: 'grid', gap: 10, padding: 12, borderRadius: 14, background: 'var(--rosa)', border: '1px solid #f3c9c5' },
+  confirmar: { display: 'grid', gap: 10, padding: 12, borderRadius: 14, background: 'var(--rosa)', border: '1px solid var(--borde-rosa)' },
   nuevo: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', padding: 8, borderRadius: 14, border: '1.5px dashed var(--lavanda-2)' },
   fila: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
   nombreProd: { fontWeight: 700, overflowWrap: 'anywhere' },

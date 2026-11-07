@@ -8,26 +8,37 @@
 }
 
 :root {
-  /* ---- Colores de marca + pasteles ---- */
-  --morado: #4b1e4d;
-  --morado-osc: #2b102d;
-  --aji: #f2a900;
-  --aji-claro: #ffc23d;
-  --tinta: #241529;
-  --suave: #6f6477;
-  --linea: #ebe3f1;
-  --fondo: #f7f3fa;
-  --lavanda: #f1eaf6;
-  --lavanda-2: #e4d8ee;
-  --menta: #e3f4ea;
-  --menta-tinta: #2e7d4f;
-  --durazno: #fff3e2;
-  --rosa: #fdeceb;
-  --rosa-tinta: #b3261e;
-  --cielo: #e8f2fc;
+  color-scheme: dark;
+  /* ---- Marca (el superadmin podrá cambiarla por restaurante) ---- */
+  --marca: #4d8dff;
+  --sobre-marca: #06142e;
 
-  --sombra: 0 1px 2px rgba(75, 30, 77, 0.05), 0 8px 24px -14px rgba(75, 30, 77, 0.22);
-  --sombra-alta: 0 2px 6px rgba(75, 30, 77, 0.08), 0 18px 40px -18px rgba(75, 30, 77, 0.35);
+  /* ---- Modo oscuro (por defecto) ---- */
+  --fondo: #0d131f;
+  --sup: #141c2b; /* tarjetas */
+  --lavanda: #1b2536; /* superficie 2 */
+  --lavanda-2: #2c3a55; /* bordes de campos */
+  --linea: #26324a;
+  --tinta: #eaf0fb;
+  --suave: #8fa0bd;
+  --menta-tinta: #3dd9a0;
+  --aviso-tinta: #ffb547;
+  --rosa-tinta: #ff6b6b;
+  --sobre-rosa: #2a0606;
+
+  --morado: var(--marca);
+  --aji: var(--marca);
+  --aji-claro: color-mix(in srgb, var(--marca) 78%, white);
+  --menta: color-mix(in srgb, var(--menta-tinta) 16%, var(--sup));
+  --durazno: color-mix(in srgb, var(--aviso-tinta) 15%, var(--sup));
+  --rosa: color-mix(in srgb, var(--rosa-tinta) 15%, var(--sup));
+  --cielo: color-mix(in srgb, var(--marca) 15%, var(--sup));
+  --borde-menta: color-mix(in srgb, var(--menta-tinta) 45%, transparent);
+  --borde-aviso: color-mix(in srgb, var(--aviso-tinta) 45%, transparent);
+  --borde-rosa: color-mix(in srgb, var(--rosa-tinta) 45%, transparent);
+
+  --sombra: 0 1px 2px rgba(0, 0, 0, 0.25), 0 10px 28px -16px rgba(0, 0, 0, 0.55);
+  --sombra-alta: 0 2px 6px rgba(0, 0, 0, 0.3), 0 20px 44px -18px rgba(0, 0, 0, 0.7);
 
   /* ---- Movimiento: una sola curva suave + un "resorte" con leve rebote (gelatina) ---- */
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -38,6 +49,26 @@
   --radio: 14px;
   --seguro-abajo: env(safe-area-inset-bottom, 0px);
   --seguro-arriba: env(safe-area-inset-top, 0px);
+}
+
+/* ---- Modo claro ---- */
+:root[data-tema='claro'] {
+  color-scheme: light;
+  --marca: #2f6fe0;
+  --sobre-marca: #ffffff;
+  --fondo: #f3f6fb;
+  --sup: #ffffff;
+  --lavanda: #eaf0f8;
+  --lavanda-2: #cdd8e8;
+  --linea: #d8e1ee;
+  --tinta: #101828;
+  --suave: #5b6b84;
+  --menta-tinta: #12805a;
+  --aviso-tinta: #a85a00;
+  --rosa-tinta: #c62f2f;
+  --sobre-rosa: #ffffff;
+  --sombra: 0 1px 2px rgba(16, 24, 40, 0.06), 0 8px 24px -14px rgba(16, 24, 40, 0.2);
+  --sombra-alta: 0 2px 6px rgba(16, 24, 40, 0.08), 0 18px 40px -18px rgba(16, 24, 40, 0.3);
 }
 
 html {
@@ -56,8 +87,7 @@ body {
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   background:
-    radial-gradient(900px 520px at -10% -10%, #fff1df 0%, transparent 60%),
-    radial-gradient(900px 600px at 110% 110%, #ece2f6 0%, transparent 60%),
+    radial-gradient(900px 520px at 100% -10%, color-mix(in srgb, var(--marca) 16%, transparent) 0%, transparent 60%),
     var(--fondo);
   background-attachment: fixed;
 }
@@ -155,26 +185,25 @@ button:disabled {
 }
 
 .btn-principal {
-  background: linear-gradient(180deg, var(--aji-claro) 0%, var(--aji) 100%);
-  color: #3a2400;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 6px 16px -8px rgba(242, 169, 0, 0.9);
+  background: var(--marca);
+  color: var(--sobre-marca);
+  box-shadow: 0 6px 16px -8px color-mix(in srgb, var(--marca) 80%, transparent);
 }
 
 .btn-principal:active:not(:disabled) {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 2px 6px -4px rgba(242, 169, 0, 0.9);
+  box-shadow: 0 2px 6px -4px color-mix(in srgb, var(--marca) 80%, transparent);
 }
 
 .btn-morado {
-  background: linear-gradient(180deg, #5c2a5f 0%, var(--morado) 100%);
-  color: #fff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 6px 16px -8px rgba(75, 30, 77, 0.8);
+  background: color-mix(in srgb, var(--marca) 16%, var(--sup));
+  color: var(--marca);
+  border-color: color-mix(in srgb, var(--marca) 40%, transparent);
 }
 
 .btn-sec {
-  background: #fff;
+  background: var(--lavanda);
   border-color: var(--linea);
-  color: var(--morado);
-  box-shadow: 0 1px 2px rgba(75, 30, 77, 0.06);
+  color: var(--tinta);
 }
 
 .btn-suave {
@@ -183,9 +212,8 @@ button:disabled {
 }
 
 .btn-peligro {
-  background: linear-gradient(180deg, #c8382f 0%, var(--rosa-tinta) 100%);
-  color: #fff;
-  box-shadow: 0 6px 16px -8px rgba(179, 38, 30, 0.8);
+  background: var(--rosa-tinta);
+  color: var(--sobre-rosa);
 }
 
 /* Primer paso de algo destructivo: tranquilo, rosado. La confirmación sí es roja. */
@@ -207,7 +235,7 @@ button:disabled {
   }
   .btn-sec:hover:not(:disabled) {
     border-color: var(--lavanda-2);
-    background: #fdfbfe;
+    background: color-mix(in srgb, var(--lavanda) 70%, var(--sup));
   }
   .btn-suave:hover:not(:disabled) {
     background: var(--lavanda-2);
@@ -262,7 +290,8 @@ button:disabled {
   font-size: 16px; /* 16px evita el zoom automático del iPhone */
   border-radius: 12px;
   border: 1px solid var(--lavanda-2);
-  background: #fff;
+  background: var(--sup);
+  color: var(--tinta);
   transition:
     border-color var(--dur) var(--ease),
     box-shadow var(--dur) var(--ease),
@@ -280,8 +309,8 @@ button:disabled {
 .campo:focus,
 .campo-chico:focus {
   outline: none;
-  border-color: #b79bcb;
-  box-shadow: 0 0 0 4px rgba(155, 115, 185, 0.18);
+  border-color: var(--marca);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--marca) 22%, transparent);
 }
 
 /* Al guardar en el lugar: borde menta un instante. Si no se pudo: tiembla en rosado. */
@@ -291,20 +320,20 @@ button:disabled {
 }
 @keyframes guardado {
   0% {
-    border-color: #6cc497;
-    box-shadow: 0 0 0 4px rgba(108, 196, 151, 0.28);
-    background-color: #f3fbf6;
+    border-color: var(--menta-tinta);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--menta-tinta) 28%, transparent);
+    background-color: var(--menta);
   }
   100% {
     border-color: var(--lavanda-2);
-    box-shadow: 0 0 0 0 rgba(108, 196, 151, 0);
-    background-color: #fff;
+    box-shadow: 0 0 0 0 transparent;
+    background-color: var(--sup);
   }
 }
 .campo.invalido,
 .campo-chico.invalido {
   animation: tiembla 360ms var(--ease);
-  border-color: #e7a7a2;
+  border-color: var(--rosa-tinta);
 }
 
 .etiqueta {
@@ -353,7 +382,7 @@ button:disabled {
    Tarjetas y superficies
    ============================================================================================ */
 .tarjeta {
-  background: #fff;
+  background: var(--sup);
   border: 1px solid var(--linea);
   border-radius: var(--radio);
   box-shadow: var(--sombra);
@@ -383,7 +412,7 @@ button:disabled {
   padding: 10px 12px;
   border-radius: 12px;
   background: var(--lavanda);
-  color: #5b4d63;
+  color: var(--suave);
   font-size: 14px;
 }
 
@@ -513,12 +542,12 @@ button:disabled {
 /* Destello pastel: "esto acaba de cambiar" */
 @keyframes brilla {
   0% {
-    background-color: #fff2c9;
-    box-shadow: 0 0 0 3px rgba(255, 194, 61, 0.45);
+    background-color: var(--cielo);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--marca) 45%, transparent);
   }
   100% {
-    background-color: #fff;
-    box-shadow: 0 0 0 0 rgba(255, 194, 61, 0);
+    background-color: var(--sup);
+    box-shadow: 0 0 0 0 transparent;
   }
 }
 .brilla {
@@ -535,10 +564,10 @@ button:disabled {
 /* Cocina: anillo que late 3 veces cuando llega un ticket nuevo */
 @keyframes anillo {
   0% {
-    box-shadow: 0 0 0 0 rgba(242, 169, 0, 0.55);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--marca) 55%, transparent);
   }
   100% {
-    box-shadow: 0 0 0 16px rgba(242, 169, 0, 0);
+    box-shadow: 0 0 0 16px color-mix(in srgb, var(--marca) 0%, transparent);
   }
 }
 .ticket-nuevo,
@@ -552,10 +581,10 @@ button:disabled {
 @keyframes lista {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(76, 175, 120, 0);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--menta-tinta) 0%, transparent);
   }
   50% {
-    box-shadow: 0 0 0 7px rgba(76, 175, 120, 0.3);
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--menta-tinta) 30%, transparent);
   }
 }
 .mesa-lista,
@@ -569,10 +598,10 @@ button:disabled {
 @keyframes urgente {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(233, 138, 131, 0);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--rosa-tinta) 0%, transparent);
   }
   50% {
-    box-shadow: 0 0 0 6px rgba(233, 138, 131, 0.28);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--rosa-tinta) 28%, transparent);
   }
 }
 .ticket-urgente,
@@ -626,10 +655,10 @@ button:disabled {
 @keyframes respira {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(242, 169, 0, 0.45);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--marca) 45%, transparent);
   }
   50% {
-    box-shadow: 0 0 0 10px rgba(242, 169, 0, 0);
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--marca) 0%, transparent);
   }
 }
 .respira {
@@ -709,9 +738,9 @@ button:disabled {
   gap: 10px;
   max-width: min(440px, 100%);
   padding: 11px 18px 11px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--linea);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
+  background: color-mix(in srgb, var(--sup) 94%, transparent);
   -webkit-backdrop-filter: blur(14px) saturate(1.4);
   backdrop-filter: blur(14px) saturate(1.4);
   box-shadow: var(--sombra-alta);
@@ -807,7 +836,7 @@ button:disabled {
 }
 .esqueleto-bloque {
   border-radius: var(--radio);
-  background: linear-gradient(90deg, #efe8f4 0%, #f8f4fb 40%, #efe8f4 80%);
+  background: linear-gradient(90deg, var(--lavanda) 0%, color-mix(in srgb, var(--lavanda) 55%, var(--sup)) 40%, var(--lavanda) 80%);
   background-size: 300% 100%;
   animation: brillo-carga 1.6s var(--ease) infinite;
 }
@@ -832,7 +861,7 @@ button:disabled {
   color: var(--suave);
   border: 1.5px dashed var(--lavanda-2);
   border-radius: var(--radio);
-  background: rgba(255, 255, 255, 0.55);
+  background: color-mix(in srgb, var(--sup) 60%, transparent);
 }
 .vacio-icono {
   font-size: 34px;
@@ -883,17 +912,17 @@ button:disabled {
   height: 24px;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 2px 6px rgba(36, 21, 41, 0.22);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
   transition:
     transform 380ms var(--resorte),
     width 160ms var(--ease);
 }
 .interruptor input:checked + .interruptor-pista {
-  background: #6cc497;
+  background: var(--menta-tinta);
 }
 /* En "Agotados", encendido significa "se acabó": rojo suave en vez de verde */
 .interruptor-alerta input:checked + .interruptor-pista {
-  background: #e98a83;
+  background: var(--rosa-tinta);
 }
 .interruptor input:checked + .interruptor-pista .interruptor-bola {
   transform: translateX(20px);
@@ -906,7 +935,7 @@ button:disabled {
   transform: translateX(16px);
 }
 .interruptor input:focus-visible + .interruptor-pista {
-  outline: 3px solid rgba(242, 169, 0, 0.85);
+  outline: 3px solid color-mix(in srgb, var(--marca) 85%, transparent);
   outline-offset: 2px;
 }
 
@@ -932,13 +961,13 @@ button:disabled {
   left: 4px;
   width: calc((100% - 8px) / var(--n));
   border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 2px 8px -2px rgba(75, 30, 77, 0.25);
+  background: var(--lavanda-2);
+  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.35);
   transform: translateX(calc(var(--pos) * 100%));
   transition: transform 420ms var(--resorte);
 }
 .segmento.oscuro::before {
-  background: linear-gradient(180deg, #5c2a5f 0%, var(--morado) 100%);
+  background: var(--marca);
 }
 .segmento button {
   min-width: 0;
@@ -955,10 +984,10 @@ button:disabled {
   text-overflow: ellipsis;
 }
 .segmento button[aria-pressed='true'] {
-  color: var(--morado);
+  color: var(--tinta);
 }
 .segmento.oscuro button[aria-pressed='true'] {
-  color: #fff;
+  color: var(--sobre-marca);
 }
 .segmento button:active:not(:disabled) {
   transform: scale(0.97);
@@ -987,16 +1016,16 @@ button:disabled {
   padding: 9px 16px;
   border-radius: 99px;
   border: 1px solid var(--lavanda-2);
-  background: #fff;
+  background: var(--sup);
   font-size: 15px;
   font-weight: 700;
   color: var(--suave);
 }
 .chip[aria-pressed='true'] {
   border-color: transparent;
-  background: linear-gradient(180deg, var(--aji-claro) 0%, var(--aji) 100%);
-  color: #3a2400;
-  box-shadow: 0 6px 14px -8px rgba(242, 169, 0, 0.9);
+  background: var(--marca);
+  color: var(--sobre-marca);
+  box-shadow: 0 6px 14px -8px color-mix(in srgb, var(--marca) 90%, transparent);
 }
 
 /* ============================================================================================
@@ -1027,7 +1056,7 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 a:focus-visible {
-  outline: 3px solid rgba(242, 169, 0, 0.85);
+  outline: 3px solid color-mix(in srgb, var(--marca) 85%, transparent);
   outline-offset: 2px;
 }
 

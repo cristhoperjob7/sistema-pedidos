@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from './supabase'
-import { formatear } from './moneda'
-import { Cargando, Desplegable, Mensaje, NumeroAnimado, Segmento } from './ui'
+import { formatear, leerPrecio, soloPrecio } from './moneda'
+import { Cargando, Desplegable, Mensaje, NumeroAnimado, Segmento, Confirmar } from './ui'
 import { avisar, celebrar, sentir, sonar, vibrar } from './feedback'
+import { createPortal } from 'react-dom'
 import Anclar from './Anclar'
-import Agotados from './Agotados'
+import Icono from './iconos'
+import './orden.css'
 import { esPropio, estaAgotado, hoyEn, useHoy } from './agotado'
 
 // Pedidos para llevar: no tienen mesa, se identifican como "Llevar 3" (y el nombre del cliente, si se pidió).
@@ -20,6 +22,7 @@ const MESA_LLEVAR = { id: null, numero: null, nombre: null, llevar: true }
 export default function Mesera({ restaurante, rol = 'mesera' }) {
   const [datos, setDatos] = useState(null)
   const [error, setError] = useState('')
+  const [juntando, setJuntando] = useState(false) // ventana para juntar mesas (antes de pedir)
   const [vista, setVista] = useState({ nombre: 'mesas' }) // { nombre: 'mesas' | 'mesa' | 'llevar' | 'cobrar', mesaId, llevarId, atras }
   const temporizador = useRef(null)
   const listosVistos = useRef(null) // pedidos listos ya conocidos; null en la primera carga para no avisar de golpe
@@ -99,6 +102,7 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
       .channel(`salon-${restaurante.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos', filter: filtro }, programar)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'items_pedido', filter: filtro }, programar)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'mesas', filter: filtro }, programar)
       // Cocina marcó un ticket como listo (o el salón lo entregó): se vuelve a leer lo pendiente de retirar.
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'envios_cocina', filter: filtro }, programar)
       // Un plato se agotó (o volvió): se actualiza el menú y se avisa si lo hizo otra persona.
@@ -148,7 +152,7 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
   }, [datos])
 
   // El salón retiró lo que cocina dejó listo en esa mesa.
-  async function entregar(pedido) {
+  async function entregar(pedido, ircobrar = false) {
     sentir('toque', 'exito')
     // La marca "Lista" se apaga al instante; si algo falla se vuelve a leer la verdad.
     setDatos((d) => ({ ...d, listos: d.listos.filter((e) => e.pedido_id !== pedido.id) }))
@@ -160,13 +164,18 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
     }
     setError('')
     avisar(`${etiquetaPedido(pedido, datos.mesas)} · entregado`, 'ok')
+    if (ircobrar) setVista({ nombre: 'cobrar', llevarId: pedido.id })
   }
 
   if (error && !datos) return <Mensaje tipo="error">{error}</Mensaje>
   if (!datos) return <Cargando filas={4} alto={84} />
 
   const enVistaLlevar = vista.nombre === 'llevar' || (vista.nombre === 'cobrar' && vista.llevarId !== undefined)
-  const mesa = enVistaLlevar ? MESA_LLEVAR : vista.mesaId ? datos.mesas.find((m) => m.id === vista.mesaId) : null
+  // Una mesa unida a otra se atiende desde la principal.
+  const mesaPedida = enVistaLlevar ? MESA_LLEVAR : vista.mesaId ? datos.mesas.find((m) => m.id === vista.mesaId) : null
+  const mesa = mesaPedida?.unida_a ? datos.mesas.find((m) => m.id === mesaPedida.unida_a) ?? mesaPedida : mesaPedida
+  const miembrosDe = new Map()
+  datos.mesas.forEach((m) => m.unida_a && miembrosDe.set(m.unida_a, [...(miembrosDe.get(m.unida_a) ?? []), m]))
   const pedido = enVistaLlevar
     ? vista.llevarId
       ? datos.pedidos.find((p) => p.id === vista.llevarId)
@@ -184,10 +193,11 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
         datos={datos}
         rol={rol}
         mesa={mesa}
+        miembros={mesa?.llevar ? [] : miembrosDe.get(mesa?.id) ?? []}
         pedido={pedido}
         items={items}
         listos={pedido ? listosPorPedido.get(pedido.id) : undefined}
-        onEntregar={() => pedido && entregar(pedido)}
+        onEntregar={() => pedido && entregar(pedido, esLlevar(pedido))}
         atras={vista.atras}
         recargar={cargar}
         // Un pedido para llevar nuevo recién enviado: se sigue en la misma pantalla, ya con su número.
@@ -196,6 +206,7 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
           sentir('toque')
           setVista({ nombre: 'mesas', atras: true })
         }}
+        onIrAMesa={(id) => setVista({ nombre: 'mesa', mesaId: id })}
         onCobrar={() => {
           sentir('toque')
           setVista(mesa.llevar ? { nombre: 'cobrar', llevarId: pedido.id } : { nombre: 'cobrar', mesaId: mesa.id })
@@ -225,7 +236,9 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
   }
 
   const llevarAbiertos = datos.pedidos.filter(esLlevar).sort((x, y) => x.llevar_numero - y.llevar_numero)
-  const ocupadas = datos.mesas.filter((m) => pedidoPorMesa.has(m.id)).length
+  const mesasVisibles = datos.mesas.filter((m) => !m.unida_a)
+  const ocupadas = mesasVisibles.filter((m) => pedidoPorMesa.has(m.id) || miembrosDe.has(m.id)).length
+  const libresN = mesasVisibles.length - ocupadas
 
   return (
     <div className={vista.atras ? 'entra-izquierda' : 'aparece'}>
@@ -233,22 +246,21 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
         <h2 style={{ margin: 0 }}>Mesas</h2>
         {datos.mesas.length > 0 && (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <span style={{ ...s.pastilla, background: 'var(--durazno)', color: '#8a4b00' }}>
+            <span style={{ ...s.pastilla, background: 'var(--durazno)', color: 'var(--aviso-tinta)' }}>
               <b key={ocupadas} className="contador-pop">
                 {ocupadas}
               </b>{' '}
               ocupada{ocupadas === 1 ? '' : 's'}
             </span>
             <span style={{ ...s.pastilla, background: 'var(--menta)', color: 'var(--menta-tinta)' }}>
-              <b key={datos.mesas.length - ocupadas} className="contador-pop">
-                {datos.mesas.length - ocupadas}
+              <b key={libresN} className="contador-pop">
+                {libresN}
               </b>{' '}
-              libre{datos.mesas.length - ocupadas === 1 ? '' : 's'}
+              libre{libresN === 1 ? '' : 's'}
             </span>
           </div>
         )}
       </div>
-      <Agotados restaurante={restaurante} />
       <Mensaje tipo="error">{error}</Mensaje>
 
       {/* Cliente que viene solo a buscar: no necesita mesa. El nombre se pide al enviar. */}
@@ -262,6 +274,32 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
       >
         🥡 Pedido para llevar
       </button>
+      {mesasVisibles.length > 1 && (
+        <button
+          className="btn btn-sec btn-bloque"
+          style={{ marginBottom: 12 }}
+          onClick={() => {
+            sentir('toque')
+            setJuntando(true)
+          }}
+        >
+          🔗 Juntar mesas
+        </button>
+      )}
+      {juntando && (
+        <JuntarMesas
+          datos={datos}
+          principal={null}
+          miembros={[]}
+          pedidoPorMesa={pedidoPorMesa}
+          onCerrar={() => setJuntando(false)}
+          onHecho={async (id) => {
+            setJuntando(false)
+            await cargar()
+            setVista({ nombre: 'mesa', mesaId: id })
+          }}
+        />
+      )}
 
       {llevarAbiertos.length > 0 && (
         <div style={{ marginBottom: 14 }}>
@@ -270,6 +308,9 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
             {llevarAbiertos.map((p, i) => {
               const its = itemsPorPedido.get(p.id) ?? []
               const lista = listosPorPedido.get(p.id)
+              // Cocina ya lo dejó todo listo y ya se entregó: lo único que falta es cobrar.
+              const porCobrar =
+                !lista && its.length > 0 && its.every((x) => !x.va_a_cocina || (x.envio_id && datos.preparados?.has(x.envio_id)))
               return (
                 <div
                   key={p.id}
@@ -288,26 +329,39 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
                       <span
                         key={String(!!lista)}
                         className="contador-pop"
-                        style={{ ...s.punto, background: lista ? '#2E9E62' : '#F28C38' }}
+                        style={{ ...s.punto, background: lista ? 'var(--menta-tinta)' : porCobrar ? 'var(--marca)' : 'var(--aviso-tinta)' }}
                         aria-hidden="true"
                       />
                     </span>
                     {p.cliente && <small style={s.mesaNombre}>{p.cliente}</small>}
                     <span
-                      key={lista ? 'lista' : 'normal'}
-                      className={lista ? 'contador-pop' : undefined}
-                      style={{ fontWeight: 800, fontSize: 14, color: lista ? '#1f6b43' : '#8a4b00' }}
+                      key={lista ? 'lista' : porCobrar ? 'cobrar' : 'normal'}
+                      className={lista || porCobrar ? 'contador-pop' : undefined}
+                      style={{ fontWeight: 800, fontSize: 14, color: lista ? 'var(--menta-tinta)' : porCobrar ? 'var(--marca)' : 'var(--aviso-tinta)' }}
                     >
-                      {lista ? '🔔 Lista' : 'En preparación'}
+                      {lista ? '🔔 Lista' : porCobrar ? '💳 Por cobrar' : 'En preparación'}
                     </span>
                     <small className="suave" style={{ lineHeight: 1.3 }}>
                       {`#${p.numero} · ${its.reduce((n, x) => n + x.cantidad, 0)} ítems · ${formatear(p.total, restaurante)}`}
                     </small>
                   </button>
-                  <Desplegable abierto={!!lista}>
-                    <button className="btn btn-principal btn-chico btn-bloque" style={{ marginTop: 6 }} onClick={() => entregar(p)}>
-                      ✓ Entregado
-                    </button>
+                  <Desplegable abierto={!!lista || porCobrar}>
+                    {lista ? (
+                      <button className="btn btn-principal btn-chico btn-bloque" style={{ marginTop: 6 }} onClick={() => entregar(p, true)}>
+                        ✓ Entregar y cobrar
+                      </button>
+                    ) : (
+                      <button
+                        className="btn btn-principal btn-chico btn-bloque"
+                        style={{ marginTop: 6 }}
+                        onClick={() => {
+                          sentir('toque')
+                          setVista({ nombre: 'cobrar', llevarId: p.id })
+                        }}
+                      >
+                        💳 Cobrar
+                      </button>
+                    )}
                   </Desplegable>
                 </div>
               )
@@ -325,10 +379,11 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
         </div>
       )}
       <div style={s.grid}>
-        {datos.mesas.map((m, i) => {
+        {mesasVisibles.map((m, i) => {
+          const grupo = miembrosDe.get(m.id) ?? []
           const p = pedidoPorMesa.get(m.id)
           const its = p ? itemsPorPedido.get(p.id) ?? [] : []
-          const ocupada = !!p
+          const ocupada = !!p || grupo.length > 0
           const lista = p ? listosPorPedido.get(p.id) : undefined
           const listaLlevar = !!lista?.some((e) => e.modalidad === 'llevar')
           return (
@@ -349,11 +404,11 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
                 }}
               >
                 <span style={s.mesaArriba}>
-                  <b style={{ fontSize: 28, lineHeight: 1 }}>{m.numero}</b>
+                  <b style={{ fontSize: 28, lineHeight: 1 }}>{m.numero}{grupo.length > 0 && <span style={{ fontSize: 15, fontWeight: 800 }}> +{grupo.map((g) => g.numero).join(' +')}</span>}</b>
                   <span
                     key={`${ocupada}${!!lista}`}
                     className="contador-pop"
-                    style={{ ...s.punto, background: lista ? '#2E9E62' : ocupada ? '#F28C38' : '#6cc497' }}
+                    style={{ ...s.punto, background: lista ? 'var(--menta-tinta)' : ocupada ? 'var(--aviso-tinta)' : 'var(--menta-tinta)' }}
                     aria-hidden="true"
                   />
                 </span>
@@ -361,12 +416,14 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
                 <span
                   key={lista ? 'lista' : 'normal'}
                   className={lista ? 'contador-pop' : undefined}
-                  style={{ fontWeight: 800, fontSize: 14, color: lista ? '#1f6b43' : ocupada ? '#8a4b00' : 'var(--menta-tinta)' }}
+                  style={{ fontWeight: 800, fontSize: 14, color: lista ? 'var(--menta-tinta)' : ocupada ? 'var(--aviso-tinta)' : 'var(--menta-tinta)' }}
                 >
-                  {lista ? `🔔 Lista${listaLlevar ? ' · para llevar' : ''}` : ocupada ? 'Ocupada' : 'Libre'}
+                  {lista ? `🔔 Lista${listaLlevar ? ' · para llevar' : ''}` : p ? 'Ocupada' : grupo.length > 0 ? '🔗 Juntas' : 'Libre'}
                 </span>
                 <small className="suave" style={{ lineHeight: 1.3 }}>
-                  {ocupada
+                  {grupo.length > 0 && !p
+                    ? 'Toca para tomar el pedido'
+                    : ocupada
                     ? `#${p.numero} · ${its.reduce((n, x) => n + x.cantidad, 0)} ítems · ${formatear(p.total, restaurante)}`
                     : 'Tocar para abrir'}
                 </small>
@@ -389,11 +446,141 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
   )
 }
 
-function Mesa({ restaurante, datos, rol, mesa, pedido, items, listos, onEntregar, onCreado, atras, onVolver, onCobrar, recargar }) {
+// Juntar mesas ANTES de pedir (una familia grande): las elegidas quedan unidas a una principal y
+// comparten una sola cuenta. Desde la mesa principal también se agregan o se quitan mesas.
+function JuntarMesas({ datos, principal, miembros, pedidoPorMesa, onCerrar, onHecho }) {
+  const [sel, setSel] = useState(() => new Set())
+  const [error, setError] = useState('')
+  const [trabajando, setTrabajando] = useState(false)
+  const enGrupo = (m) => !!m.unida_a || datos.mesas.some((x) => x.unida_a === m.id)
+  const libres = datos.mesas.filter((m) => m.id !== principal?.id && !pedidoPorMesa.has(m.id) && !enGrupo(m))
+  const elegidas = datos.mesas.filter((m) => sel.has(m.id))
+  const minimo = principal ? 1 : 2
+  const pri = principal ?? [...elegidas].sort((a, b) => a.numero - b.numero)[0]
+  const otras = elegidas.filter((m) => m.id !== pri?.id)
+
+  async function llamar(nombre, args) {
+    setError('')
+    setTrabajando(true)
+    const { error } = await supabase.rpc(nombre, args)
+    setTrabajando(false)
+    if (error) {
+      setError(error.message)
+      return false
+    }
+    return true
+  }
+  async function juntar() {
+    if (!pri || elegidas.length < minimo) return
+    const ids = principal ? elegidas.map((m) => m.id) : otras.map((m) => m.id)
+    if (!(await llamar('unir_mesas', { p_principal: pri.id, p_otras: ids }))) return
+    sonar('exito')
+    avisar(`Mesas ${[pri.numero, ...(principal ? [] : []), ...(principal ? elegidas : otras).map((m) => m.numero)].join(' + ')} juntas`, 'ok')
+    onHecho(pri.id)
+  }
+  async function quitar(m) {
+    if (!(await llamar('separar_mesa', { p_mesa: m.id }))) return
+    sentir('toque', 'tic')
+    onHecho(principal.id)
+  }
+  async function separarTodo() {
+    if (!(await llamar('separar_mesa', { p_mesa: principal.id }))) return
+    sonar('pop')
+    avisar('Mesas separadas', 'info')
+    onHecho(principal.id)
+  }
+
+  return createPortal(
+    <div className="hoja-velo funde" onClick={onCerrar}>
+      <div className="hoja sube" role="dialog" aria-modal="true" aria-label="Juntar mesas" onClick={(e) => e.stopPropagation()}>
+        <div className="hoja-asa" aria-hidden="true" />
+        <div className="hoja-cab">
+          <h3 style={{ margin: 0 }}>{principal ? `Mesa ${principal.numero} · juntar mesas` : 'Juntar mesas'}</h3>
+          <button className="btn btn-chico btn-sec" style={{ width: 40, padding: 0 }} aria-label="Cerrar" onClick={onCerrar}>
+            <Icono n="cerrar" tam={18} />
+          </button>
+        </div>
+        <div className="hoja-cuerpo" style={{ paddingBottom: 'calc(18px + var(--seguro-abajo))' }}>
+          <Mensaje tipo="error">{error}</Mensaje>
+
+          {principal && miembros.length > 0 && (
+            <div style={{ display: 'grid', gap: 8 }}>
+              <h4 className="hoja-sec">Mesas juntas</h4>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {miembros.map((m) => (
+                  <span key={m.id} className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    Mesa {m.numero}
+                    <button style={{ all: 'unset', cursor: 'pointer', fontWeight: 900 }} disabled={trabajando} aria-label={`Quitar la mesa ${m.numero}`} onClick={() => quitar(m)}>
+                      ✕
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <button className="btn btn-sec btn-chico" style={{ justifySelf: 'start' }} disabled={trabajando} onClick={separarTodo}>
+                Separar todas
+              </button>
+            </div>
+          )}
+
+          <small className="suave">
+            {principal
+              ? 'Elige las mesas libres que quieres sumar a esta cuenta.'
+              : 'Elige 2 o más mesas libres. Quedan como una sola, con una sola cuenta.'}
+          </small>
+          {libres.length === 0 && <small className="suave">No hay mesas libres para juntar.</small>}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: 10 }}>
+            {libres.map((m) => {
+              const on = sel.has(m.id)
+              return (
+                <button
+                  key={m.id}
+                  className={`btn ${on ? 'btn-principal' : 'btn-sec'}`}
+                  style={{ display: 'grid', gap: 2, padding: '12px 8px' }}
+                  aria-pressed={on}
+                  onClick={() => {
+                    sentir('toque', 'tic')
+                    setSel((s0) => {
+                      const n = new Set(s0)
+                      n.has(m.id) ? n.delete(m.id) : n.add(m.id)
+                      return n
+                    })
+                  }}
+                >
+                  <b style={{ fontSize: 22 }}>{m.numero}</b>
+                  <small>{on ? '✓' : 'Libre'}</small>
+                </button>
+              )
+            })}
+          </div>
+
+          {elegidas.length >= minimo && (
+            <p className="aparece" style={{ margin: 0, fontSize: 16 }}>
+              {principal
+                ? <>Se suman a la <b>mesa {principal.numero}</b>: {elegidas.map((m) => m.numero).join(', ')}.</>
+                : <>Quedan juntas las mesas <b>{[pri, ...otras].map((m) => m.numero).sort((a, b) => a - b).join(' + ')}</b>, y se atienden desde la mesa <b>{pri.numero}</b>.</>}
+            </p>
+          )}
+          <button className="btn btn-principal" disabled={elegidas.length < minimo || trabajando} onClick={juntar}>
+            {trabajando ? 'Juntando…' : 'Juntar mesas'}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, listos, onEntregar, onCreado, atras, onVolver, onCobrar, onIrAMesa, recargar }) {
   const hoy = useHoy(restaurante.zona_horaria)
   const esAdmin = rol === 'admin'
   const esLlevarVista = !!mesa.llevar // pedido para llevar (sin mesa)
-  const rotulo = esLlevarVista ? (pedido ? etiquetaLlevar(pedido) : 'Pedido para llevar') : `Mesa ${mesa.numero}`
+  const rotulo = esLlevarVista
+    ? pedido
+      ? etiquetaLlevar(pedido)
+      : 'Pedido para llevar'
+    : miembros.length > 0
+      ? `Mesas ${[mesa.numero, ...miembros.map((x) => x.numero)].join(' + ')}`
+      : `Mesa ${mesa.numero}`
   const [pidiendoNombre, setPidiendoNombre] = useState(false) // pedido para llevar nuevo: se pregunta el nombre antes de enviar
   const [nombreCliente, setNombreCliente] = useState('')
   const [catId, setCatId] = useState(datos.cats[0]?.id ?? null)
@@ -405,10 +592,27 @@ function Mesa({ restaurante, datos, rol, mesa, pedido, items, listos, onEntregar
   const [error, setError] = useState('')
   const [trabajando, setTrabajando] = useState(false)
   const [llevar, setLlevar] = useState(false) // false = servir en el local
+  const [abierta, setAbierta] = useState(false) // ventana de la orden
+  const [juntando, setJuntando] = useState(false) // ventana para agregar o quitar mesas del grupo
+  const [moviendo, setMoviendo] = useState(false) // ventana para cambiar o juntar mesa
+  const [destino, setDestino] = useState(null) // mesa elegida, pendiente de confirmar
   const [resaltar, setResaltar] = useState(() => new Set()) // nombres recién enviados (destello)
   const tResaltar = useRef(null)
 
   useEffect(() => () => clearTimeout(tResaltar.current), [])
+
+  // Con la orden abierta: la página de fondo no se mueve y Escape la cierra.
+  useEffect(() => {
+    if (!abierta) return
+    const previo = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const alTeclear = (e) => e.key === 'Escape' && setAbierta(false)
+    window.addEventListener('keydown', alTeclear)
+    return () => {
+      document.body.style.overflow = previo
+      window.removeEventListener('keydown', alTeclear)
+    }
+  }, [abierta])
 
   const catsPorId = useMemo(() => new Map(datos.cats.map((c) => [c.id, c])), [datos.cats])
   const prodsPorId = useMemo(() => new Map(datos.prods.map((p) => [p.id, p])), [datos.prods])
@@ -438,10 +642,9 @@ function Mesa({ restaurante, datos, rol, mesa, pedido, items, listos, onEntregar
   const lineasPend = Object.entries(pend)
     .map(([id, v]) => ({ prod: prodsPorId.get(id), n: v.n, nota: v.nota ?? '' }))
     .filter((x) => x.prod && x.n > 0)
-  const cocinaTab = !!catActual?.va_a_cocina
-  const lineasTab = lineasPend.filter((x) => !!catsPorId.get(x.prod.categoria_id)?.va_a_cocina === cocinaTab)
-  const hayOtras = lineasPend.length - lineasTab.length
-  const hayAgotadoEnEnvio = lineasTab.some((x) => agotado(x.prod))
+  // Se envía todo lo pendiente junto: lo que va a cocina genera ticket, lo demás se suma directo al pedido.
+  const hayCocina = lineasPend.some((x) => !!catsPorId.get(x.prod.categoria_id)?.va_a_cocina)
+  const hayAgotadoEnEnvio = lineasPend.some((x) => agotado(x.prod))
 
   const totalConf = items.reduce((t, i) => t + i.cantidad * Number(i.precio_unitario), 0)
   const totalPend = lineasPend.reduce((t, x) => t + x.n * Number(x.prod.precio), 0)
@@ -490,16 +693,22 @@ function Mesa({ restaurante, datos, rol, mesa, pedido, items, listos, onEntregar
   }
 
   async function confirmar() {
-    if (!lineasTab.length) return
+    if (!lineasPend.length) return
     // Pedido para llevar nuevo: antes de enviarlo se pregunta el nombre del cliente.
     if (esLlevarVista && !pedido && !pidiendoNombre) {
       sentir('toque', 'tic')
       setPidiendoNombre(true)
       return
     }
+    // El nombre es obligatorio: con él se llama al cliente cuando el pedido está listo.
+    if (esLlevarVista && !pedido && !nombreCliente.trim()) {
+      sentir('aviso')
+      setError('Escribe el nombre del cliente para poder llamarlo cuando esté listo.')
+      return
+    }
     sentir('toque')
-    const enviados = lineasTab.map((x) => x.prod.nombre)
-    const productos = lineasTab.map((x) => ({ producto_id: x.prod.id, cantidad: x.n, nota: x.nota.trim() }))
+    const enviados = lineasPend.map((x) => x.prod.nombre)
+    const productos = lineasPend.map((x) => ({ producto_id: x.prod.id, cantidad: x.n, nota: x.nota.trim() }))
     const ok = esLlevarVista
       ? await llamar('enviar_items_llevar', {
           p_restaurante: restaurante.id,
@@ -516,16 +725,17 @@ function Mesa({ restaurante, datos, rol, mesa, pedido, items, listos, onEntregar
           ? etiquetaLlevar({ llevar_numero: ok.llevar_numero, cliente: nombreCliente.trim() })
           : rotulo
         : rotulo
-      avisar(cocinaTab ? `Enviado a cocina · ${etiquetaEnvio}` : `Añadido al pedido · ${etiquetaEnvio}`, cocinaTab ? 'cocina' : 'ok')
+      avisar(hayCocina ? `Enviado a cocina · ${etiquetaEnvio}` : `Añadido al pedido · ${etiquetaEnvio}`, hayCocina ? 'cocina' : 'ok')
       setPidiendoNombre(false)
       if (esLlevarVista && !pedido && ok.pedido_id) onCreado(ok.pedido_id)
       setResaltar(new Set(enviados))
       clearTimeout(tResaltar.current)
       tResaltar.current = setTimeout(() => setResaltar(new Set()), 1600)
       setLlevar(false)
+      setAbierta(false)
       setPend((p) => {
         const c = { ...p }
-        lineasTab.forEach((x) => delete c[x.prod.id])
+        lineasPend.forEach((x) => delete c[x.prod.id])
         return c
       })
       setEditandoNota(null)
@@ -566,15 +776,31 @@ function Mesa({ restaurante, datos, rol, mesa, pedido, items, listos, onEntregar
     }
   }
 
+  // Cambiar la cuenta a otra mesa libre, o juntarla con la cuenta de una mesa ocupada.
+  async function mover() {
+    if (!destino) return
+    const ok = await llamar('mover_pedido', { p_pedido: pedido.id, p_mesa_destino: destino.id })
+    if (!ok) return
+    sonar('exito')
+    avisar(ok.unido ? `Mesa ${mesa.numero} juntada con la mesa ${destino.numero}` : `Cuenta pasada a la mesa ${destino.numero}`, 'ok')
+    setMoviendo(false)
+    setDestino(null)
+    await recargar()
+    onIrAMesa(ok.mesa_id ?? destino.id)
+  }
+  const puedeMover = !esLlevarVista && !!pedido && miembros.length === 0 && grupos.length > 0 && lineasPend.length === 0 && !trabajando
+
   const puedeCobrar = grupos.length > 0 && lineasPend.length === 0 && !trabajando
-  const hayParaEnviar = lineasTab.length > 0 && !hayAgotadoEnEnvio
+  const hayParaEnviar = lineasPend.length > 0 && !hayAgotadoEnEnvio
   const preguntaNombre = pidiendoNombre && hayParaEnviar
+
+  const sinEnviar = lineasPend.reduce((n, x) => n + x.n, 0)
 
   return (
     <>
       <div
         className={atras ? 'entra-izquierda' : 'entra-derecha'}
-        style={{ ...s.contenido, paddingBottom: `calc(${preguntaNombre ? 340 : hayParaEnviar ? (esLlevarVista ? 170 : 250) : 150}px + var(--seguro-abajo))` }}
+        style={{ ...s.contenido, paddingBottom: 'calc(120px + var(--seguro-abajo))' }}
       >
         <div style={s.cabecera}>
           <button className="btn btn-fantasma" onClick={onVolver}>
@@ -585,6 +811,33 @@ function Mesa({ restaurante, datos, rol, mesa, pedido, items, listos, onEntregar
             {rotulo}
             {!esLlevarVista && mesa.nombre ? <span className="suave" style={{ fontWeight: 600 }}> · {mesa.nombre}</span> : ''}
           </h2>
+          {!esLlevarVista && (
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, flex: 'none' }}>
+              <button
+                className="btn btn-chico btn-sec"
+                onClick={() => {
+                  sentir('toque')
+                  setJuntando(true)
+                }}
+              >
+                🔗 Juntar
+              </button>
+              {!!pedido && (
+                <button
+                  className="btn btn-chico btn-sec"
+                  disabled={!puedeMover}
+                  title={puedeMover ? 'Pasar la cuenta a otra mesa' : miembros.length ? 'Separa las mesas juntas antes de cambiar de mesa' : 'Envía a cocina lo que falta antes de cambiar de mesa'}
+                  onClick={() => {
+                    sentir('toque')
+                    setDestino(null)
+                    setMoviendo(true)
+                  }}
+                >
+                  ⇄ Cambiar
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         <Mensaje tipo="error">{error}</Mensaje>
@@ -600,141 +853,11 @@ function Mesa({ restaurante, datos, rol, mesa, pedido, items, listos, onEntregar
               </small>
             </span>
             <button className="btn btn-principal" onClick={onEntregar}>
-              ✓ Entregado
+              {esLlevarVista ? '✓ Entregar y cobrar' : '✓ Entregado'}
             </button>
           </div>
         </Desplegable>
 
-        <Desplegable abierto={grupos.length > 0 && !!pedido}>
-          {pedido && (
-            <div style={s.pedidoCard}>
-              <h3 style={{ ...s.titulo, margin: '0 0 4px' }}>
-                Pedido #{pedido.numero} <small className="suave" style={{ fontWeight: 600 }}>· ya enviado</small>
-              </h3>
-              {grupos.map((g) => (
-                <div key={g.clave} className={`entra${resaltar.has(g.nombre) ? ' brilla' : ''}`} style={s.filaEnviada}>
-                  <div style={{ flex: 1, minWidth: 140 }}>
-                    <b>
-                      <span key={g.cantidad} className="contador-pop">
-                        {g.cantidad}
-                      </span>{' '}
-                      × {g.nombre}
-                    </b>
-                    {g.nota && <span style={s.notaChip}>📝 {g.nota}</span>}
-                    {g.preparado > 0 && (
-                      <span style={s.preparadoChip}>
-                        🍳 {g.preparado === g.cantidad ? 'Ya preparado' : `${g.preparado} ya preparado${g.preparado === 1 ? '' : 's'}`}
-                      </span>
-                    )}
-                    <br />
-                    <small className="suave">
-                      {g.va_a_cocina ? '🍳 En cocina' : 'No va a cocina'}
-                      {g.llevar > 0 ? ` · ${g.llevar === g.cantidad ? 'para llevar' : `${g.llevar} para llevar`}` : ''} ·{' '}
-                      {formatear(g.total, restaurante)}
-                    </small>
-                  </div>
-                  {conf === g.clave ? (
-                    <div className="infla" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                      {esAdmin && g.preparado > 0 && (
-                        <small style={s.avisoPerdida}>
-                          Cocina ya preparó {g.preparado === g.cantidad ? 'todo esto' : `${g.preparado} de ${g.cantidad}`}. Si lo anulas, se
-                          contará como pérdida.
-                        </small>
-                      )}
-                      {anulables(g) > 1 && (
-                        <div style={s.cantidad}>
-                          <button
-                            className="btn-redondo btn-suave"
-                            aria-label="Una menos"
-                            onClick={() => {
-                              sentir('toque', 'popBajo')
-                              setCq((n) => Math.max(1, n - 1))
-                            }}
-                          >
-                            −
-                          </button>
-                          <b key={cq} className="contador-pop numero" style={{ minWidth: 20, textAlign: 'center' }}>
-                            {Math.min(cq, anulables(g))}
-                          </b>
-                          <button
-                            className="btn-redondo btn-suave"
-                            aria-label="Una más"
-                            onClick={() => {
-                              sentir('toque', 'pop')
-                              setCq((n) => Math.min(anulables(g), n + 1))
-                            }}
-                          >
-                            +
-                          </button>
-                        </div>
-                      )}
-                      <button className="btn btn-peligro" disabled={trabajando} onClick={() => anular(g)}>
-                        {trabajando ? <span className="puntos">Anulando</span> : 'Sí, anular'}
-                      </button>
-                      <button className="btn btn-sec" onClick={() => setConf(null)}>
-                        No
-                      </button>
-                    </div>
-                  ) : anulables(g) > 0 ? (
-                    <button
-                      className="btn btn-chico btn-peligro-suave"
-                      onClick={() => {
-                        sentir('toque')
-                        setConf(g.clave)
-                        setCq(1)
-                        setConfTodo(false)
-                      }}
-                    >
-                      Anular
-                    </button>
-                  ) : (
-                    <small className="suave" style={s.sinAnular}>
-                      Cocina ya lo preparó. Si fue un error, avisa al administrador.
-                    </small>
-                  )}
-                </div>
-              ))}
-
-              {!esAdmin && hayPreparado && (
-                <small className="suave" style={s.sinAnular}>
-                  Cocina ya preparó parte del pedido. Solo el administrador puede anularlo completo.
-                </small>
-              )}
-              <Desplegable abierto={!confTodo && (esAdmin || !hayPreparado)}>
-                <button
-                  className="btn btn-peligro-suave btn-bloque"
-                  style={{ marginTop: 4 }}
-                  onClick={() => {
-                    sentir('toque')
-                    setConfTodo(true)
-                    setConf(null)
-                  }}
-                >
-                  Anular orden completa
-                </button>
-              </Desplegable>
-              <Desplegable abierto={confTodo}>
-                <div style={s.confirmarTodo}>
-                  <b>¿Anular la orden completa?</b>
-                  <small className="suave">Se avisa a la cocina de todo lo que ya se envió.</small>
-                  {esAdmin && hayPreparado && (
-                    <small style={s.avisoPerdida}>Cocina ya preparó parte del pedido: se contará como pérdida.</small>
-                  )}
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn btn-sec" style={{ flex: 1 }} onClick={() => setConfTodo(false)}>
-                      No
-                    </button>
-                    <button className="btn btn-peligro" style={{ flex: 1 }} disabled={trabajando} onClick={anularTodo}>
-                      {trabajando ? <span className="puntos">Anulando</span> : 'Sí, anular todo'}
-                    </button>
-                  </div>
-                </div>
-              </Desplegable>
-            </div>
-          )}
-        </Desplegable>
-
-        {grupos.length > 0 && pedido && <h3 style={s.titulo}>Agregar al pedido</h3>}
 
         <div className="chips">
           {datos.cats.map((c) => (
@@ -766,8 +889,6 @@ function Mesa({ restaurante, datos, rol, mesa, pedido, items, listos, onEntregar
         <div key={catId} style={s.lista}>
           {prodsCat.map((p, i) => {
             const q = pend[p.id]?.n ?? 0
-            const nota = pend[p.id]?.nota ?? ''
-            const escribiendo = editandoNota === p.id
             const sinStock = agotado(p) // solo se ve si ya estaba elegido: hay que quitarlo
             return (
               <div
@@ -806,10 +927,180 @@ function Mesa({ restaurante, datos, rol, mesa, pedido, items, listos, onEntregar
                     </button>
                   )}
                 </div>
+              </div>
+            )
+          })}
+        </div>
+        {datos.cats.length > 0 && prodsCat.length === 0 && (
+          <p className="nota aparece">
+            {soloAgotados ? '🚫 Todo lo de esta categoría está agotado por hoy.' : 'Esta categoría no tiene productos activos.'}
+          </p>
+        )}
+      </div>
 
-                {/* Nota para cocina: aparece solo cuando el producto ya está elegido. */}
-                <div style={{ flexBasis: '100%', minWidth: 0 }}>
-                  <Desplegable abierto={q > 0}>
+      {/* Barra de la orden: siempre a la vista, con el ícono de papel y lápiz. */}
+      <div className="sube barra-orden-caja">
+        <button
+          className={`barra-orden${sinEnviar > 0 ? ' pendiente' : ''}`}
+          disabled={unidades === 0}
+          aria-label={`Ver la orden de ${rotulo}`}
+          onClick={() => {
+            sentir('toque')
+            setAbierta(true)
+          }}
+        >
+          <span className="barra-orden-ic">
+            <Icono n="orden" tam={24} />
+            {unidades > 0 && (
+              <em key={unidades} className="contador-pop">
+                {unidades}
+              </em>
+            )}
+          </span>
+          <span className="barra-orden-t">
+            <small>
+              {unidades === 0 ? 'Orden vacía' : sinEnviar > 0 ? `${sinEnviar} sin enviar` : 'Orden enviada'}
+            </small>
+            <b>
+              <NumeroAnimado valor={totalConf + totalPend} duracion={380} formato={(n) => formatear(n, restaurante)} />
+            </b>
+          </span>
+          <span className="barra-orden-ir">
+            Ver orden <Icono n="siguiente" tam={18} />
+          </span>
+        </button>
+      </div>
+
+      {juntando && (
+        <JuntarMesas
+          datos={datos}
+          principal={mesa}
+          miembros={miembros}
+          pedidoPorMesa={new Map(datos.pedidos.filter((p) => p.mesa_id).map((p) => [p.mesa_id, p]))}
+          onCerrar={() => setJuntando(false)}
+          onHecho={async () => {
+            setJuntando(false)
+            await recargar()
+          }}
+        />
+      )}
+      {moviendo &&
+        createPortal(
+          <div className="hoja-velo funde" onClick={() => setMoviendo(false)}>
+            <div className="hoja sube" role="dialog" aria-modal="true" aria-label="Cambiar o juntar mesa" onClick={(e) => e.stopPropagation()}>
+              <div className="hoja-asa" aria-hidden="true" />
+              <div className="hoja-cab">
+                <h3 style={{ margin: 0 }}>Mesa {mesa.numero} · ¿a dónde va?</h3>
+                <button className="btn btn-chico btn-sec" style={{ width: 40, padding: 0 }} aria-label="Cerrar" onClick={() => setMoviendo(false)}>
+                  <Icono n="cerrar" tam={18} />
+                </button>
+              </div>
+              <div className="hoja-cuerpo" style={{ paddingBottom: 'calc(18px + var(--seguro-abajo))' }}>
+                <Mensaje tipo="error">{error}</Mensaje>
+                {!destino ? (
+                  <>
+                    <small className="suave">Elige una mesa libre para cambiar la cuenta, o una ocupada para juntarlas.</small>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(104px, 1fr))', gap: 10 }}>
+                      {datos.mesas
+                        .filter((m) => m.id !== mesa.id && !m.unida_a)
+                        .map((m) => {
+                          const ocupada = datos.pedidos.find((p) => p.mesa_id === m.id)
+                          return (
+                            <button
+                              key={m.id}
+                              className="btn btn-sec"
+                              style={{ display: 'grid', gap: 2, padding: '12px 8px', borderColor: ocupada ? 'var(--borde-aviso)' : 'var(--borde-menta)' }}
+                              onClick={() => {
+                                sentir('toque')
+                                setDestino({ ...m, ocupada: !!ocupada })
+                              }}
+                            >
+                              <b style={{ fontSize: 22 }}>{m.numero}</b>
+                              <small style={{ color: ocupada ? 'var(--aviso-tinta)' : 'var(--menta-tinta)', fontWeight: 800 }}>{ocupada ? 'Ocupada' : 'Libre'}</small>
+                            </button>
+                          )
+                        })}
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ display: 'grid', gap: 12 }}>
+                    <p style={{ margin: 0, fontSize: 17, lineHeight: 1.4 }}>
+                      {destino.ocupada ? (
+                        <>La cuenta de la <b>mesa {mesa.numero}</b> se junta con la de la <b>mesa {destino.numero}</b>. Quedan en una sola cuenta, en la mesa {destino.numero}.</>
+                      ) : (
+                        <>La cuenta de la <b>mesa {mesa.numero}</b> pasa a la <b>mesa {destino.numero}</b>. La mesa {mesa.numero} queda libre.</>
+                      )}
+                    </p>
+                    <button className="btn btn-principal" disabled={trabajando} onClick={mover}>
+                      {trabajando ? 'Moviendo…' : destino.ocupada ? `Juntar con la mesa ${destino.numero}` : `Pasar a la mesa ${destino.numero}`}
+                    </button>
+                    <button className="btn btn-sec" disabled={trabajando} onClick={() => setDestino(null)}>
+                      Elegir otra mesa
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {abierta && (
+        <div className="hoja-velo funde" onClick={() => setAbierta(false)}>
+          <div className="hoja sube" role="dialog" aria-modal="true" aria-label={`Orden · ${rotulo}`} onClick={(e) => e.stopPropagation()}>
+            <div className="hoja-asa" aria-hidden="true" />
+            <div className="hoja-cab">
+              <h3 style={{ margin: 0, minWidth: 0, overflowWrap: 'anywhere' }}>Orden · {rotulo}</h3>
+              <button className="btn btn-chico btn-sec" style={{ width: 40, padding: 0 }} aria-label="Cerrar la orden" onClick={() => setAbierta(false)}>
+                <Icono n="cerrar" tam={18} />
+              </button>
+            </div>
+
+            <div className="hoja-cuerpo">
+              <Mensaje tipo="error">{error}</Mensaje>
+
+              {unidades === 0 && (
+                <div className="vacio">
+                  <span className="vacio-icono">📝</span>
+                  <b>La orden está vacía</b>
+                  <span>Vuelve y toca “+” en los productos.</span>
+                </div>
+              )}
+
+              {lineasPend.length > 0 && (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  <h4 className="hoja-sec">Por enviar</h4>
+                  {lineasPend.map((x) => {
+                    const p = x.prod
+                    const nota = x.nota
+                    const escribiendo = editandoNota === p.id
+                    const sinStock = agotado(p)
+                    return (
+                      <div key={p.id} className="entra" style={{ ...s.producto, ...(sinStock ? s.productoAgotado : s.productoElegido) }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <b style={{ display: 'block' }}>{p.nombre}</b>
+                          {sinStock ? (
+                            <span className="infla" style={s.etiquetaAgotado}>
+                              🚫 Se agotó · quítalo con −
+                            </span>
+                          ) : (
+                            <small className="suave">{formatear(x.n * Number(p.precio), restaurante)}</small>
+                          )}
+                        </div>
+                        <div style={s.cantidad}>
+                          <button className="btn-redondo btn-suave" aria-label={`Quitar ${p.nombre}`} onClick={() => cambiar(p, -1)}>
+                            −
+                          </button>
+                          <b key={x.n} className="contador-pop numero" style={{ minWidth: 22, textAlign: 'center', fontSize: 18 }}>
+                            {x.n}
+                          </b>
+                          {!sinStock && (
+                            <button className="btn-redondo btn-principal" aria-label={`Agregar ${p.nombre}`} onClick={() => cambiar(p, 1)}>
+                              +
+                            </button>
+                          )}
+                        </div>
+                        <div style={{ flexBasis: '100%', minWidth: 0 }}>
                     <div style={s.notaArea}>
                       {escribiendo ? (
                         <form
@@ -866,120 +1157,238 @@ function Mesa({ restaurante, datos, rol, mesa, pedido, items, listos, onEntregar
                         </button>
                       )}
                     </div>
-                  </Desplegable>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-              </div>
-            )
-          })}
-        </div>
-        {datos.cats.length > 0 && prodsCat.length === 0 && (
-          <p className="nota aparece">
-            {soloAgotados ? '🚫 Todo lo de esta categoría está agotado por hoy.' : 'Esta categoría no tiene productos activos.'}
-          </p>
-        )}
-        {hayAgotadoEnEnvio && (
-          <p className="nota aparece">
-            🚫 Se agotó: {lineasTab.filter((x) => agotado(x.prod)).map((x) => x.prod.nombre).join(', ')}. Quítalo (con −) para
-            poder enviar el pedido.
-          </p>
-        )}
+              )}
 
-        {hayOtras > 0 && (
-          <p className="nota aparece">Tienes productos pendientes en otra categoría. Cámbiate a ella para confirmarlos.</p>
-        )}
-        {lineasPend.length > 0 && grupos.length > 0 && (
-          <p className="nota aparece">Para cobrar, primero confirma o quita los productos pendientes.</p>
-        )}
-      </div>
+        <Desplegable abierto={grupos.length > 0 && !!pedido}>
+          {pedido && (
+            <div style={s.pedidoCard}>
+              <h3 style={{ ...s.titulo, margin: '0 0 4px' }}>
+                Pedido #{pedido.numero} <small className="suave" style={{ fontWeight: 600 }}>· ya enviado</small>
+              </h3>
+              {grupos.map((g) => (
+                <div key={g.clave} className={`entra${resaltar.has(g.nombre) ? ' brilla' : ''}`} style={s.filaEnviada}>
+                  <div style={{ flex: 1, minWidth: 140 }}>
+                    <b>
+                      <span key={g.cantidad} className="contador-pop">
+                        {g.cantidad}
+                      </span>{' '}
+                      × {g.nombre}
+                    </b>
+                    {g.nota && <span style={s.notaChip}>📝 {g.nota}</span>}
+                    {g.preparado > 0 && (
+                      <span style={s.preparadoChip}>
+                        🍳 {g.preparado === g.cantidad ? 'Ya preparado' : `${g.preparado} ya preparado${g.preparado === 1 ? '' : 's'}`}
+                      </span>
+                    )}
+                    <br />
+                    <small className="suave">
+                      {g.va_a_cocina ? '🍳 En cocina' : 'No va a cocina'}
+                      {g.llevar > 0 ? ` · ${g.llevar === g.cantidad ? 'para llevar' : `${g.llevar} para llevar`}` : ''} ·{' '}
+                      {formatear(g.total, restaurante)}
+                    </small>
+                  </div>
+                  {anulables(g) > 0 ? (
+                    <button
+                      className="btn btn-chico btn-peligro-suave"
+                      onClick={() => {
+                        sentir('toque')
+                        setConf(g.clave)
+                        setCq(1)
+                        setConfTodo(false)
+                      }}
+                    >
+                      Anular
+                    </button>
+                  ) : (
+                    <small className="suave" style={s.sinAnular}>
+                      Cocina ya lo preparó. Si fue un error, avisa al administrador.
+                    </small>
+                  )}
+                </div>
+              ))}
 
-      <div className="sube" style={s.barra}>
-        <div style={s.barraAncho}>
-          {/* Pedido para llevar nuevo: el nombre se pregunta aquí, al final, justo antes de enviarlo. */}
-          <Desplegable abierto={preguntaNombre}>
-            <form
-              style={s.formNombre}
-              onSubmit={(e) => {
-                e.preventDefault()
-                confirmar()
-              }}
-            >
-              <b>¿A nombre de quién?</b>
-              <small className="suave">Así lo llaman cuando esté listo. Puedes dejarlo vacío.</small>
-              <input
-                className="campo"
-                autoFocus
-                maxLength={40}
-                placeholder="Nombre del cliente (opcional)"
-                value={nombreCliente}
-                onChange={(e) => setNombreCliente(e.target.value)}
-              />
-              <div style={{ display: 'flex', gap: 8 }}>
+              {!esAdmin && hayPreparado && (
+                <small className="suave" style={s.sinAnular}>
+                  Cocina ya preparó parte del pedido. Solo el administrador puede anularlo completo.
+                </small>
+              )}
+              <Desplegable abierto={!confTodo && (esAdmin || !hayPreparado)}>
                 <button
-                  type="button"
-                  className="btn btn-sec"
+                  className="btn btn-peligro-suave btn-bloque"
+                  style={{ marginTop: 4 }}
                   onClick={() => {
                     sentir('toque')
-                    setPidiendoNombre(false)
+                    setConfTodo(true)
+                    setConf(null)
                   }}
                 >
-                  Volver
+                  Anular orden completa
                 </button>
-                <button className="btn btn-morado" style={{ flex: 1 }} disabled={trabajando}>
-                  {trabajando ? <span className="puntos">Enviando</span> : cocinaTab ? '🍳 Enviar a cocina' : 'Añadir al pedido'}
-                </button>
-              </div>
-            </form>
-          </Desplegable>
-          <Desplegable abierto={hayParaEnviar && !esLlevarVista && !preguntaNombre}>
-            <div style={{ paddingBottom: 10 }}>
-              <Segmento
-                oscuro
-                etiqueta="Modalidad del pedido"
-                valor={llevar}
-                onChange={setLlevar}
-                opciones={[
-                  [false, '🍽️ Servir'],
-                  [true, '🥡 Para llevar'],
-                ]}
+              </Desplegable>
+              <Confirmar
+                abierto={confTodo}
+                titulo="¿Anular la orden completa?"
+                texto={
+                  <>
+                    Se avisa a la cocina de todo lo que ya se envió.
+                    {esAdmin && hayPreparado && (
+                      <small style={{ ...s.avisoPerdida, display: 'block', marginTop: 8 }}>
+                        Cocina ya preparó parte del pedido: se contará como pérdida.
+                      </small>
+                    )}
+                  </>
+                }
+                textoConfirmar="Sí, anular todo"
+                trabajando={trabajando}
+                onCancelar={() => setConfTodo(false)}
+                onConfirmar={anularTodo}
               />
+              <Confirmar
+                abierto={!!conf && !!grupos.find((x) => x.clave === conf)}
+                titulo={`¿Anular ${grupos.find((x) => x.clave === conf)?.nombre ?? ''}?`}
+                texto={(() => {
+                  const g = grupos.find((x) => x.clave === conf)
+                  if (!g) return null
+                  return (
+                    <>
+                      {esAdmin && g.preparado > 0 && (
+                        <small style={{ ...s.avisoPerdida, display: 'block', marginBottom: 8 }}>
+                          Cocina ya preparó {g.preparado === g.cantidad ? 'todo esto' : `${g.preparado} de ${g.cantidad}`}. Si lo anulas, se contará como pérdida.
+                        </small>
+                      )}
+                      {anulables(g) > 1 ? 'Elige cuántas unidades anular:' : 'Se quita de la cuenta y se avisa a cocina.'}
+                    </>
+                  )
+                })()}
+                textoConfirmar="Sí, anular"
+                trabajando={trabajando}
+                onCancelar={() => setConf(null)}
+                onConfirmar={() => anular(grupos.find((x) => x.clave === conf))}
+              >
+                {(() => {
+                  const g = grupos.find((x) => x.clave === conf)
+                  if (!g || anulables(g) <= 1) return null
+                  return (
+                    <div style={{ ...s.cantidad, justifySelf: 'center' }}>
+                      <button className="btn-redondo btn-suave" aria-label="Una menos" onClick={() => { sentir('toque', 'popBajo'); setCq((n) => Math.max(1, n - 1)) }}>
+                        −
+                      </button>
+                      <b key={cq} className="contador-pop numero" style={{ minWidth: 28, textAlign: 'center', fontSize: 20 }}>
+                        {Math.min(cq, anulables(g))}
+                      </b>
+                      <button className="btn-redondo btn-suave" aria-label="Una más" onClick={() => { sentir('toque', 'pop'); setCq((n) => Math.min(anulables(g), n + 1)) }}>
+                        +
+                      </button>
+                    </div>
+                  )
+                })()}
+              </Confirmar>
             </div>
-          </Desplegable>
-          <Desplegable abierto={!preguntaNombre}>
-          <div style={s.barraInterior}>
-            <div style={{ flex: '1 1 110px', minWidth: 0 }}>
-              <small className="suave" style={{ display: 'block' }}>
-                <span key={unidades} className="contador-pop">
-                  {unidades}
-                </span>{' '}
-                ítem{unidades === 1 ? '' : 's'}
-              </small>
-              <b style={s.total}>
-                <NumeroAnimado valor={totalConf + totalPend} duracion={380} formato={(n) => formatear(n, restaurante)} />
-              </b>
+          )}
+        </Desplegable>
             </div>
-            <div style={s.botonesBarra}>
-            <button
-              className={`btn ${hayParaEnviar ? 'btn-morado' : 'btn-suave'}`}
-              style={s.botonBarra}
-              disabled={!hayParaEnviar || trabajando}
-              onClick={confirmar}
-            >
-              {trabajando && hayParaEnviar ? (
-                <span className="puntos">Enviando</span>
-              ) : cocinaTab ? (
-                '🍳 A cocina'
-              ) : (
-                'AÑADIR'
+
+            <div className="hoja-pie">
+              <div className="hoja-total">
+                <span>Total</span>
+                <b>
+                  <NumeroAnimado valor={totalConf + totalPend} duracion={380} formato={(n) => formatear(n, restaurante)} />
+                </b>
+              </div>
+
+              {/* Pedido para llevar nuevo: el nombre se pregunta aquí, al final, justo antes de enviarlo. */}
+              <Desplegable abierto={preguntaNombre}>
+                <form
+                  style={s.formNombre}
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    confirmar()
+                  }}
+                >
+                  <b>¿A nombre de quién?</b>
+                  <small className="suave">Con este nombre lo llaman cuando el pedido esté listo.</small>
+                  <input
+                    className="campo"
+                    autoFocus
+                    maxLength={40}
+                    placeholder="Nombre del cliente"
+                    required
+                    value={nombreCliente}
+                    onChange={(e) => setNombreCliente(e.target.value)}
+                  />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      type="button"
+                      className="btn btn-sec"
+                      onClick={() => {
+                        sentir('toque')
+                        setPidiendoNombre(false)
+                      }}
+                    >
+                      Volver
+                    </button>
+                    <button className="btn btn-principal" style={{ flex: 1 }} disabled={trabajando || !nombreCliente.trim()}>
+                      {trabajando ? <span className="puntos">Enviando</span> : hayCocina ? '🍳 Enviar a cocina' : 'Añadir al pedido'}
+                    </button>
+                  </div>
+                </form>
+              </Desplegable>
+
+              <Desplegable abierto={hayParaEnviar && !esLlevarVista && !preguntaNombre}>
+                <div style={{ paddingBottom: 10 }}>
+                  <Segmento
+                    oscuro
+                    etiqueta="Modalidad del pedido"
+                    valor={llevar}
+                    onChange={setLlevar}
+                    opciones={[
+                      [false, '🍽️ Servir'],
+                      [true, '🥡 Para llevar'],
+                    ]}
+                  />
+                </div>
+              </Desplegable>
+
+              {hayAgotadoEnEnvio && (
+                <p className="nota aparece">
+                  🚫 Se agotó: {lineasPend.filter((x) => agotado(x.prod)).map((x) => x.prod.nombre).join(', ')}. Quítalo (con −) para poder
+                  enviar la orden.
+                </p>
               )}
-            </button>
-            <button className="btn btn-principal" style={s.botonBarra} disabled={!puedeCobrar} onClick={onCobrar}>
-              Cobrar
-            </button>
+
+              <Desplegable abierto={!preguntaNombre}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button className="btn btn-sec" style={{ flex: '1 1 130px', minHeight: 50 }} onClick={() => setAbierta(false)}>
+                    Seguir agregando
+                  </button>
+                  {lineasPend.length > 0 ? (
+                    <button className="btn btn-principal" style={{ flex: '2 1 190px', minHeight: 50 }} disabled={!hayParaEnviar || trabajando} onClick={confirmar}>
+                      {trabajando && hayParaEnviar ? <span className="puntos">Enviando</span> : hayCocina ? '🍳 Enviar a cocina' : 'Añadir al pedido'}
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn-principal"
+                      style={{ flex: '2 1 190px', minHeight: 50 }}
+                      disabled={!puedeCobrar}
+                      onClick={() => {
+                        setAbierta(false)
+                        onCobrar()
+                      }}
+                    >
+                      Cobrar
+                    </button>
+                  )}
+                </div>
+              </Desplegable>
             </div>
           </div>
-          </Desplegable>
         </div>
-      </div>
+      )}
     </>
   )
 }
@@ -987,6 +1396,8 @@ function Mesa({ restaurante, datos, rol, mesa, pedido, items, listos, onEntregar
 function Cobrar({ restaurante, datos, mesa, pedido, items, onVolver, onListo }) {
   const [error, setError] = useState('')
   const [trabajando, setTrabajando] = useState(null) // id del método que se está cobrando
+  const [propinaModo, setPropinaModo] = useState('10') // '0' | '5' | '10' | 'otro'
+  const [propinaOtro, setPropinaOtro] = useState('')
 
   const lineas = useMemo(() => {
     const g = new Map()
@@ -1000,12 +1411,21 @@ function Cobrar({ restaurante, datos, mesa, pedido, items, onVolver, onListo }) 
   }, [items])
   const total = lineas.reduce((t, l) => t + l.total, 0)
 
+  // Propina: sugerida (10 %) o cualquier otro monto. Es voluntaria: siempre se puede quitar.
+  const decimales = restaurante.moneda_decimales ?? 0
+  const redondear = (n) => Math.round(n * 10 ** decimales) / 10 ** decimales
+  const otro = leerPrecio(propinaOtro === '' ? '0' : propinaOtro, restaurante)
+  const propina = propinaModo === 'otro' ? (otro ?? 0) : redondear((total * Number(propinaModo)) / 100)
+  const propinaInvalida = propinaModo === 'otro' && otro === null
+  const aPagar = total + propina
+
   async function cobrar(metodo, e) {
     const boton = e.currentTarget
+    if (propinaInvalida) return setError('La propina no es válida.')
     sentir('toque')
     setError('')
     setTrabajando(metodo.id)
-    const { error } = await supabase.rpc('cobrar_pedido', { p_pedido: pedido.id, p_metodo: metodo.id })
+    const { error } = await supabase.rpc('cobrar_pedido', { p_pedido: pedido.id, p_metodo: metodo.id, p_propina: propina })
     if (error) {
       setTrabajando(null)
       setError(error.message)
@@ -1014,7 +1434,7 @@ function Cobrar({ restaurante, datos, mesa, pedido, items, onVolver, onListo }) 
     celebrar(boton)
     vibrar('exito')
     sonar('cobro')
-    avisar(`${pedido && mesa.llevar ? etiquetaLlevar(pedido) : `Mesa ${mesa.numero}`} cobrada · ${formatear(total, restaurante)}`, 'cobro')
+    avisar(`${pedido && mesa.llevar ? etiquetaLlevar(pedido) : `Mesa ${mesa.numero}`} cobrada · ${formatear(aPagar, restaurante)}`, 'cobro')
     // Una pausa breve para que se alcance a disfrutar la confirmación antes de volver.
     setTimeout(onListo, 550)
   }
@@ -1054,10 +1474,57 @@ function Cobrar({ restaurante, datos, mesa, pedido, items, onVolver, onListo }) 
         ))}
       </div>
 
+      <div className="tarjeta" style={{ display: 'grid', gap: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+          <b>Propina</b>
+          <small className="suave">Voluntaria · el cliente decide</small>
+        </div>
+        <div className="propina-opciones" role="group" aria-label="Propina">
+          {[
+            ['0', 'Sin propina'],
+            ['5', '5 %'],
+            ['10', '10 % sugerida'],
+            ['otro', 'Otro monto'],
+          ].map(([id, texto]) => (
+            <button
+              key={id}
+              className="chip"
+              aria-pressed={propinaModo === id}
+              disabled={!!trabajando}
+              onClick={() => {
+                sentir('toque', 'tic')
+                setPropinaModo(id)
+              }}
+            >
+              {texto}
+            </button>
+          ))}
+        </div>
+        <Desplegable abierto={propinaModo === 'otro'}>
+          <label className="etiqueta" style={{ paddingTop: 2 }}>
+            Monto de la propina ({restaurante.moneda_simbolo})
+            <input
+              className="campo"
+              inputMode={decimales > 0 ? 'decimal' : 'numeric'}
+              placeholder={decimales > 0 ? '0.00' : '0'}
+              value={propinaOtro}
+              disabled={!!trabajando}
+              onChange={(e) => setPropinaOtro(soloPrecio(e.target.value, restaurante))}
+            />
+          </label>
+        </Desplegable>
+        <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--suave)', fontWeight: 700 }}>
+          <span>Cuenta {formatear(total, restaurante)}</span>
+          <span style={{ color: propina > 0 ? 'var(--menta-tinta)' : undefined }}>
+            + Propina {formatear(propina, restaurante)}
+          </span>
+        </div>
+      </div>
+
       <div style={s.totalCobro}>
         <small style={{ opacity: 0.8 }}>Total a cobrar</small>
         <b style={{ fontSize: 'clamp(30px, 9vw, 40px)', lineHeight: 1.1 }}>
-          <NumeroAnimado valor={total} duracion={650} formato={(n) => formatear(n, restaurante)} />
+          <NumeroAnimado valor={aPagar} duracion={650} formato={(n) => formatear(n, restaurante)} />
         </b>
       </div>
 
@@ -1072,7 +1539,7 @@ function Cobrar({ restaurante, datos, mesa, pedido, items, onVolver, onListo }) 
             key={m.id}
             className="btn btn-principal btn-grande entra"
             style={{ animationDelay: `${120 + i * 50}ms`, opacity: trabajando === m.id ? 1 : undefined }}
-            disabled={!!trabajando}
+            disabled={!!trabajando || propinaInvalida}
             onClick={(e) => cobrar(m, e)}
           >
             {trabajando === m.id ? <span className="puntos">Cobrando</span> : m.nombre}
@@ -1115,12 +1582,12 @@ const s = {
     font: 'inherit',
     cursor: 'pointer',
   },
-  mesaLista: { background: 'linear-gradient(180deg, #f3fcf6 0%, #e4f6ec 100%)', borderColor: '#7ccb9e' },
-  mesaLibre: { background: '#fff', borderColor: '#cdebd9' },
-  mesaOcupada: { background: 'linear-gradient(180deg, #fff8ee 0%, #fff1de 100%)', borderColor: '#f6cf9b' },
+  mesaLista: { background: 'var(--menta)', borderColor: 'var(--menta-tinta)' },
+  mesaLibre: { background: 'var(--sup)', borderColor: 'var(--linea)' },
+  mesaOcupada: { background: 'var(--durazno)', borderColor: 'var(--borde-aviso)' },
   mesaArriba: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   mesaNombre: { color: 'var(--suave)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
-  punto: { display: 'inline-block', width: 12, height: 12, borderRadius: '50%', boxShadow: '0 0 0 4px rgba(255,255,255,.8)' },
+  punto: { display: 'inline-block', width: 12, height: 12, borderRadius: '50%', boxShadow: '0 0 0 4px var(--sup)' },
   cabecera: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, marginLeft: -8, flexWrap: 'wrap' },
   titulo: { margin: '16px 0 8px', fontSize: 17 },
   pedidoCard: {
@@ -1138,7 +1605,7 @@ const s = {
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 10,
-    background: 'white',
+    background: 'var(--sup)',
     borderRadius: 14,
     padding: '10px 12px',
   },
@@ -1149,7 +1616,7 @@ const s = {
     padding: 12,
     borderRadius: 14,
     background: 'var(--rosa)',
-    border: '1px solid #f3c9c5',
+    border: '1px solid var(--borde-rosa)',
   },
   bannerListo: {
     display: 'flex',
@@ -1160,17 +1627,17 @@ const s = {
     padding: '12px 14px',
     borderRadius: 16,
     background: 'var(--menta)',
-    border: '1px solid #9bd7b4',
+    border: '1px solid var(--borde-menta)',
     color: 'var(--menta-tinta)',
   },
-  etiquetaAgotado: { display: 'inline-block', marginTop: 2, padding: '2px 8px', borderRadius: 8, background: 'var(--rosa)', color: '#B3261E', fontSize: 12, fontWeight: 800 },
+  etiquetaAgotado: { display: 'inline-block', marginTop: 2, padding: '2px 8px', borderRadius: 8, background: 'var(--rosa)', color: 'var(--rosa-tinta)', fontSize: 12, fontWeight: 800 },
   lista: { display: 'grid', gap: 8 },
   producto: {
     display: 'flex',
     flexWrap: 'wrap',
     alignItems: 'center',
     gap: 10,
-    background: 'white',
+    background: 'var(--sup)',
     borderWidth: 1.5,
     borderStyle: 'solid',
     borderColor: 'var(--linea)',
@@ -1179,28 +1646,28 @@ const s = {
     boxShadow: 'var(--sombra)',
     transition: 'background-color 220ms var(--ease), border-color 220ms var(--ease)',
   },
-  productoElegido: { background: '#fffaf0', borderColor: '#f7d48a' },
-  productoAgotado: { background: 'var(--rosa)', borderColor: '#f0a9a3' },
+  productoElegido: { background: 'color-mix(in srgb, var(--marca) 10%, var(--sup))', borderColor: 'var(--marca)' },
+  productoAgotado: { background: 'var(--rosa)', borderColor: 'var(--borde-rosa)' },
   cantidad: { display: 'flex', alignItems: 'center', gap: 8, flex: 'none' },
-  notaArea: { paddingTop: 8, marginTop: 8, borderTop: '1px dashed #f1dfae' },
+  notaArea: { paddingTop: 8, marginTop: 8, borderTop: '1px dashed var(--linea)' },
   notaVacia: { color: 'var(--suave)', fontWeight: 700, padding: '4px 2px', minHeight: 36 },
-  notaPuesta: { color: '#8a4b00', background: 'var(--durazno)', padding: '6px 10px', borderRadius: 10, textAlign: 'left', whiteSpace: 'normal' },
+  notaPuesta: { color: 'var(--aviso-tinta)', background: 'var(--durazno)', padding: '6px 10px', borderRadius: 10, textAlign: 'left', whiteSpace: 'normal' },
   preparadoChip: { display: 'inline-block', marginTop: 4, marginLeft: 6, padding: '2px 8px', borderRadius: 8, background: 'var(--menta)', color: 'var(--menta-tinta)', fontSize: 13, fontWeight: 700 },
-  avisoPerdida: { flexBasis: '100%', color: '#B3261E', fontWeight: 700, lineHeight: 1.3 },
+  avisoPerdida: { flexBasis: '100%', color: 'var(--rosa-tinta)', fontWeight: 700, lineHeight: 1.3 },
   sinAnular: { maxWidth: 190, textAlign: 'right', lineHeight: 1.3, fontSize: 12 },
   formNombre: { display: 'grid', gap: 8, paddingBottom: 10 },
-  notaChip: { display: 'inline-block', marginTop: 4, padding: '2px 8px', borderRadius: 8, background: 'var(--durazno)', color: '#8a4b00', fontSize: 13, fontWeight: 700 },
+  notaChip: { display: 'inline-block', marginTop: 4, padding: '2px 8px', borderRadius: 8, background: 'var(--durazno)', color: 'var(--aviso-tinta)', fontSize: 13, fontWeight: 700 },
   barra: {
     position: 'fixed',
     zIndex: 40,
     left: 0,
     right: 0,
     bottom: 0,
-    background: 'rgba(255,255,255,.9)',
+    background: 'color-mix(in srgb, var(--sup) 92%, transparent)',
     WebkitBackdropFilter: 'blur(16px) saturate(1.3)',
     backdropFilter: 'blur(16px) saturate(1.3)',
     borderTop: '1px solid var(--linea)',
-    boxShadow: '0 -10px 30px -18px rgba(75,30,77,.35)',
+    boxShadow: '0 -10px 30px -18px rgba(0,0,0,.5)',
     padding: '12px 16px calc(12px + var(--seguro-abajo))',
     borderRadius: '20px 20px 0 0',
   },
@@ -1217,9 +1684,10 @@ const s = {
     marginTop: 12,
     padding: '16px 18px',
     borderRadius: 18,
-    color: 'white',
-    background: 'linear-gradient(135deg, #5c2a5f 0%, #4B1E4D 60%, #3a173c 100%)',
-    boxShadow: '0 14px 30px -18px rgba(75,30,77,.9)',
+    color: 'var(--tinta)',
+    background: 'linear-gradient(135deg, color-mix(in srgb, var(--marca) 30%, var(--sup)) 0%, var(--sup) 100%)',
+    border: '1px solid color-mix(in srgb, var(--marca) 35%, transparent)',
+    boxShadow: 'var(--sombra)',
   },
   pagos: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 },
 }

@@ -117,7 +117,7 @@ function Barras({ filas, formato = (v) => v, resaltarMayor = false }) {
                 ...s.relleno,
                 width: `${Math.max(5, (valor / maximo) * 100)}%`,
                 animationDelay: `${i * 60}ms`,
-                ...(resaltarMayor && valor === mayor ? { background: 'linear-gradient(90deg, #f6b4af, #e98a83)' } : null),
+                ...(resaltarMayor && valor === mayor ? { background: 'var(--rosa-tinta)' } : null),
               }}
             />
           </span>
@@ -249,7 +249,7 @@ function TiemposCocina({ restaurante, desde, hasta }) {
               etiqueta="Pasan la alerta roja"
               valor={`${r.pctRoja.toFixed(0)}%`}
               nota={`más de ${ajustes.alerta_roja_min} min`}
-              color={r.pctRoja >= 20 ? '#B3261E' : undefined}
+              color={r.pctRoja >= 20 ? 'var(--rosa-tinta)' : undefined}
             />
             <Dato etiqueta="Pasan la alerta amarilla" valor={`${r.pctAmarilla.toFixed(0)}%`} nota={`más de ${ajustes.alerta_amarilla_min} min`} />
           </div>
@@ -494,8 +494,8 @@ function FilaMapa({ hora, r, metrica, sel, onSel }) {
             onClick={() => onSel(semana)}
             style={{
               ...s.celda,
-              background: valor ? `rgba(242, 169, 0, ${0.14 + 0.86 * intensidad})` : 'var(--lavanda)',
-              color: intensidad > 0.62 ? '#3b2200' : 'var(--tinta)',
+              background: valor ? `color-mix(in srgb, var(--marca) ${Math.round((0.14 + 0.86 * intensidad) * 100)}%, var(--sup))` : 'var(--lavanda)',
+              color: intensidad > 0.62 ? 'var(--sobre-marca)' : 'var(--tinta)',
               outline: elegido ? '2.5px solid var(--morado)' : 'none',
             }}
           >
@@ -567,7 +567,7 @@ export function BotonEstadisticas() {
       }}
     >
       <b>📊 Estadísticas avanzadas ↗</b>
-      <small style={{ color: '#6f6477', fontWeight: 600 }}>Tiempos de cocina, horas punta y más. Se abre en otra pestaña.</small>
+      <small style={{ color: 'var(--suave)', fontWeight: 600 }}>Tiempos de cocina, horas punta y más. Se abre en otra pestaña.</small>
     </button>
   )
 }
@@ -575,18 +575,18 @@ export function BotonEstadisticas() {
 const s = {
   pagina: { display: 'grid', gap: 14, maxWidth: 860, margin: '0 auto', width: '100%' },
   cabecera: { marginLeft: -8 },
-  suave: { color: '#6f6477' },
+  suave: { color: 'var(--suave)' },
   seccion: { display: 'grid', gap: 14, padding: 16, borderRadius: 20 },
   subtitulo: { fontSize: 15 },
   filaTitulo: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   datos: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px, 100%), 1fr))', gap: 10 },
   dato: { display: 'grid', gap: 2, alignContent: 'start', background: 'var(--lavanda)', borderRadius: 14, padding: '10px 12px' },
   datoValor: { fontSize: 'clamp(20px, 5.6vw, 24px)', fontWeight: 900, lineHeight: 1.15, overflowWrap: 'anywhere' },
-  destacado: { display: 'grid', gap: 4, background: '#fff8e8', border: '1px solid #f7dca0', borderRadius: 14, padding: '10px 12px', fontSize: 15 },
+  destacado: { display: 'grid', gap: 4, background: 'var(--cielo)', border: '1px solid var(--linea)', borderRadius: 14, padding: '10px 12px', fontSize: 15 },
   barra: { display: 'flex', alignItems: 'center', gap: 10 },
   barraNombre: { width: '34%', flex: 'none', fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   pista: { flex: 1, minWidth: 0, height: 12, borderRadius: 99, background: 'var(--lavanda)', overflow: 'hidden' },
-  relleno: { display: 'block', height: '100%', borderRadius: 99, background: 'linear-gradient(90deg, #FFC23D, #F2A900)' },
+  relleno: { display: 'block', height: '100%', borderRadius: 99, background: 'var(--marca)' },
   barraValor: { flex: 'none', width: 92, textAlign: 'right', fontSize: 14 },
   mapa: { display: 'grid', gridTemplateColumns: '44px repeat(7, minmax(0, 1fr))', gap: 4, alignItems: 'center' },
   diaCabecera: { textAlign: 'center', fontSize: 13, color: 'var(--suave)' },

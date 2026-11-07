@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from './supabase'
 import { audioCtx, audioDesbloqueado, escucharAudio, sentir } from './feedback'
 import { Cargando, Desplegable, Mensaje } from './ui'
-import Agotados from './Agotados'
 
 const TIPOS_ANULACION = ['anulacion', 'anulacion_total']
 
@@ -53,15 +52,17 @@ export default function Cocina({ restaurante }) {
     }
   }
 
+  const [principales, setPrincipales] = useState(() => new Set()) // mesas que tienen otras unidas
+
   const cargar = useCallback(async () => {
     const rid = restaurante.id
     const inicioDia = new Date()
     inicioDia.setHours(0, 0, 0, 0)
-    const [t, a, l] = await Promise.all([
+    const [t, a, l, u] = await Promise.all([
       supabase
         .from('envios_cocina')
         .select(
-          'id, tipo, modalidad, creado_en, pedidos(numero, mesa_numero, llevar_numero, cliente, mesas(numero)), items_pedido(nombre, cantidad, nota), anulaciones(nombre, cantidad)'
+          'id, tipo, modalidad, creado_en, pedidos(numero, mesa_numero, llevar_numero, cliente, mesas(id, numero)), items_pedido(nombre, cantidad, nota), anulaciones(nombre, cantidad)'
         )
         .eq('restaurante_id', rid)
         .eq('estado', 'pendiente')
@@ -73,6 +74,8 @@ export default function Cocina({ restaurante }) {
         .eq('restaurante_id', rid)
         .eq('estado', 'listo')
         .gte('resuelto_en', inicioDia.toISOString()),
+      // Mesas juntas: la cocina ve "Mesas juntas N" en lugar de "Mesa N".
+      supabase.from('mesas').select('unida_a').eq('restaurante_id', rid).not('unida_a', 'is', null),
     ])
     if (t.error) {
       setError(t.error.message)
@@ -81,6 +84,7 @@ export default function Cocina({ restaurante }) {
     setError('')
     if (a.data) setAjustes(a.data)
     setListos(l.count ?? 0)
+    setPrincipales(new Set((u.data ?? []).map((x) => x.unida_a)))
 
     // Un ticket de pedido sin platos (todo se anuló) no tiene nada que mostrar.
     const visibles = t.data.filter((x) => TIPOS_ANULACION.includes(x.tipo) || x.items_pedido.length > 0)
@@ -174,7 +178,7 @@ export default function Cocina({ restaurante }) {
         <div>
           <h2 style={{ margin: 0 }}>Cocina</h2>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
-            <span style={{ ...s.pastilla, background: 'var(--durazno)', color: '#8a4b00' }}>
+            <span style={{ ...s.pastilla, background: 'var(--durazno)', color: 'var(--aviso-tinta)' }}>
               <b key={tickets.length} className="contador-pop">
                 {tickets.length}
               </b>{' '}
@@ -190,7 +194,6 @@ export default function Cocina({ restaurante }) {
         </div>
       </div>
 
-      <Agotados restaurante={restaurante} soloPlatos />
 
       <Mensaje tipo="error">{error}</Mensaje>
       {/* Solo aparece si se recargó la página y todavía nadie ha tocado la pantalla: no es un botón,
@@ -215,7 +218,7 @@ export default function Cocina({ restaurante }) {
           const mesa =
             t.pedidos?.llevar_numero != null
               ? `Llevar ${t.pedidos.llevar_numero}${t.pedidos.cliente ? ` · ${t.pedidos.cliente}` : ''}`
-              : `Mesa ${t.pedidos?.mesas?.numero ?? t.pedidos?.mesa_numero ?? '?'}`
+              : `${principales.has(t.pedidos?.mesas?.id) ? 'Mesas juntas' : 'Mesa'} ${t.pedidos?.mesas?.numero ?? t.pedidos?.mesa_numero ?? '?'}`
           const llevar = t.modalidad === 'llevar'
           const esAnulacion = TIPOS_ANULACION.includes(t.tipo)
           const salida = saliendo.get(t.id)
@@ -227,19 +230,19 @@ export default function Cocina({ restaurante }) {
               <div
                 key={t.id}
                 className={clase}
-                style={{ ...s.ticket, borderColor: '#f0a9a3', background: '#fff6f5', ...estiloSalida }}
+                style={{ ...s.ticket, borderColor: 'var(--borde-rosa)', background: 'var(--rosa)', ...estiloSalida }}
               >
                 <div style={s.titulo}>
                   <b>
                     {mesa} · {numero}
                   </b>
-                  <span style={{ color: '#B3261E' }}>{min} min</span>
+                  <span style={{ color: 'var(--rosa-tinta)' }}>{min} min</span>
                 </div>
-                <p style={{ margin: 0, fontWeight: 900, color: '#B3261E', fontSize: 18 }}>
+                <p style={{ margin: 0, fontWeight: 900, color: 'var(--rosa-tinta)', fontSize: 18 }}>
                   {t.tipo === 'anulacion_total' ? 'ORDEN COMPLETA ANULADA' : 'ANULADO'}
                 </p>
                 {juntar(t.anulaciones).map((l) => (
-                  <p key={l.nombre} style={{ ...s.linea, textDecoration: 'line-through', textDecorationColor: '#e7a7a2' }}>
+                  <p key={l.nombre} style={{ ...s.linea, textDecoration: 'line-through', textDecorationColor: 'var(--rosa-tinta)' }}>
                     <b>{l.cantidad}×</b> {l.nombre}
                   </p>
                 ))}
@@ -251,7 +254,7 @@ export default function Cocina({ restaurante }) {
           }
 
           const nivel = min >= ajustes.alerta_roja_min ? 'rojo' : min >= ajustes.alerta_amarilla_min ? 'amarillo' : 'ok'
-          const borde = nivel === 'rojo' ? '#e98a83' : nivel === 'amarillo' ? '#f6c95b' : 'var(--linea)'
+          const borde = nivel === 'rojo' ? 'var(--rosa-tinta)' : nivel === 'amarillo' ? 'var(--aviso-tinta)' : 'var(--linea)'
           return (
             <div
               key={t.id}
@@ -278,7 +281,7 @@ export default function Cocina({ restaurante }) {
                   style={{
                     ...s.minutos,
                     background: nivel === 'rojo' ? 'var(--rosa)' : nivel === 'amarillo' ? 'var(--durazno)' : 'var(--lavanda)',
-                    color: nivel === 'rojo' ? '#B3261E' : nivel === 'amarillo' ? '#8a4b00' : 'var(--suave)',
+                    color: nivel === 'rojo' ? 'var(--rosa-tinta)' : nivel === 'amarillo' ? 'var(--aviso-tinta)' : 'var(--suave)',
                   }}
                 >
                   {min} min
@@ -319,7 +322,7 @@ const s = {
     display: 'flex',
     flexDirection: 'column',
     gap: 8,
-    background: 'white',
+    background: 'var(--sup)',
     border: '3px solid',
     borderRadius: 18,
     padding: 14,
@@ -327,7 +330,7 @@ const s = {
     transition:
       'opacity 380ms var(--ease), transform 380ms var(--ease), background-color 200ms var(--ease), border-color 600ms var(--ease)',
   },
-  ticketListo: { opacity: 0, transform: 'scale(0.9) translateY(-6px)', background: '#effaf3', borderColor: '#8fd3ad', pointerEvents: 'none' },
+  ticketListo: { opacity: 0, transform: 'scale(0.9) translateY(-6px)', background: 'var(--menta)', borderColor: 'var(--borde-menta)', pointerEvents: 'none' },
   ticketVisto: { opacity: 0, transform: 'scale(0.94)', pointerEvents: 'none' },
   check: {
     position: 'absolute',
@@ -336,15 +339,15 @@ const s = {
     placeItems: 'center',
     fontSize: 64,
     fontWeight: 900,
-    color: '#2E7D4F',
+    color: 'var(--menta-tinta)',
     zIndex: 1,
   },
   titulo: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 20, paddingBottom: 8, borderBottom: '1px solid var(--linea)' },
   minutos: { flex: 'none', padding: '2px 10px', borderRadius: 99, fontSize: 15, fontWeight: 800, transition: 'background-color 600ms var(--ease), color 600ms var(--ease)' },
-  badgeServir: { color: '#4B1E4D' },
-  badgeLlevar: { color: 'white', background: '#4B1E4D', padding: '2px 8px', borderRadius: 8, whiteSpace: 'nowrap', fontSize: 16 },
+  badgeServir: { color: 'var(--marca)' },
+  badgeLlevar: { color: 'var(--sobre-marca)', background: 'var(--marca)', padding: '2px 8px', borderRadius: 8, whiteSpace: 'nowrap', fontSize: 16 },
   linea: { margin: 0, fontSize: 19 },
   // La indicación del cliente tiene que verse de lejos: letra grande y fondo cálido.
-  nota: { display: 'block', marginTop: 3, padding: '4px 10px', borderRadius: 10, background: '#fff3e2', color: '#8a4b00', fontSize: 17, fontWeight: 800 },
+  nota: { display: 'block', marginTop: 3, padding: '4px 10px', borderRadius: 10, background: 'var(--durazno)', color: 'var(--aviso-tinta)', fontSize: 17, fontWeight: 800 },
   boton: { marginTop: 'auto' },
 }

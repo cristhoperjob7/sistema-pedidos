@@ -1,7 +1,9 @@
+import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from './supabase'
 import { avisar, sentir, sonar, vibrar } from './feedback'
 import { Desplegable, Interruptor, Mensaje } from './ui'
+import Icono from './iconos'
 import { estaAgotado, marcarPropio, useHoy } from './agotado'
 
 // Botón "Agotados" + panel para marcar qué se acabó hoy. Lo usan el Salón y la Cocina.
@@ -66,10 +68,6 @@ export default function Agotados({ restaurante, soloPlatos = false }) {
 
   const filtro = buscar.trim().toLowerCase()
   const visibles = filtro ? lista.filter((p) => p.nombre.toLowerCase().includes(filtro)) : lista
-  const visiblesAgotados = visibles.filter((p) => estaAgotado(p, hoy))
-  const secciones = cats
-    .map((c) => ({ cat: c, items: visibles.filter((p) => p.categoria_id === c.id && !estaAgotado(p, hoy)) }))
-    .filter((x) => x.items.length > 0)
 
   async function cambiar(p, valor) {
     setError('')
@@ -102,98 +100,153 @@ export default function Agotados({ restaurante, soloPlatos = false }) {
   const fila = (p) => {
     const agot = estaAgotado(p, hoy)
     return (
-      <div key={p.id} className="entra" style={{ ...s.fila, ...(agot ? s.filaAgotada : null) }}>
+      <div key={p.id} style={{ ...s.fila, ...(agot ? s.filaAgotada : null) }}>
         <Interruptor alerta checked={agot} disabled={ocupados.has(p.id)} onChange={(v) => cambiar(p, v)}>
-          <span style={{ fontWeight: agot ? 800 : 600, color: agot ? '#B3261E' : 'inherit' }}>{p.nombre}</span>
+          <span style={{ fontWeight: agot ? 800 : 600, color: agot ? 'var(--rosa-tinta)' : 'inherit' }}>{p.nombre}</span>
         </Interruptor>
       </div>
     )
   }
 
+  // Un grupo por tipo de producto (entrada, plato, bebida…): cada uno se abre aparte.
+  const grupos = useMemo(() => {
+    const g = new Map()
+    for (const c of cats) {
+      const tipo = c.tipo ?? 'plato'
+      const items = lista.filter((p) => p.categoria_id === c.id)
+      if (!items.length) continue
+      const x = g.get(tipo) ?? { tipo, items: [] }
+      x.items.push(...items)
+      g.set(tipo, x)
+    }
+    return [...g.values()]
+  }, [cats, lista])
+
+  const [grupoAbierto, setGrupoAbierto] = useState(null)
+
   return (
-    <div style={s.contenedor}>
+    <>
       <button
-        className="btn btn-chico btn-suave"
-        aria-expanded={abierto}
+        className="btn btn-chico btn-sec"
+        style={{ position: 'relative', width: 40, padding: 0, flex: 'none' }}
+        aria-label={`Agotados${agotados.length ? `: ${agotados.length}` : ''}`}
+        title="Agotados"
         onClick={() => {
           sentir('toque', 'tic')
-          if (!abierto) cargar()
-          setAbierto((a) => !a)
+          cargar()
+          setAbierto(true)
         }}
       >
-        🚫 Agotados
+        <Icono n="prohibido" tam={18} />
         {agotados.length > 0 && (
-          <span style={s.contador}>
-            <b key={agotados.length} className="contador-pop">
-              {agotados.length}
-            </b>
-          </span>
+          <b key={agotados.length} className="contador-pop" style={s.globito}>
+            {agotados.length}
+          </b>
         )}
-        <span aria-hidden="true" style={{ ...s.flecha, transform: abierto ? 'rotate(180deg)' : 'none' }}>
-          ▾
-        </span>
       </button>
 
-      <Desplegable abierto={abierto}>
-        <div className="tarjeta" style={s.panel}>
-          <b>¿Se acabó algo hoy?</b>
-          <small className="suave">
-            Enciende el plato y desaparece del menú del salón. Mañana vuelve solo.
-            {soloPlatos ? ' Las bebidas y los postres los marca el salón.' : ''}
-          </small>
+      {abierto && createPortal(
+        <div className="hoja-velo funde" onClick={() => setAbierto(false)}>
+          <div className="hoja sube" role="dialog" aria-modal="true" aria-label="Agotados de hoy" onClick={(e) => e.stopPropagation()}>
+            <div className="hoja-asa" aria-hidden="true" />
+            <div className="hoja-cab">
+              <h3 style={{ margin: 0 }}>¿Se acabó algo hoy?</h3>
+              <button className="btn btn-chico btn-sec" style={{ width: 40, padding: 0 }} aria-label="Cerrar" onClick={() => setAbierto(false)}>
+                <Icono n="cerrar" tam={18} />
+              </button>
+            </div>
+            <div className="hoja-cuerpo" style={{ paddingBottom: 'calc(18px + var(--seguro-abajo))' }}>
+              <small className="suave">
+                Enciende lo que se acabó y desaparece del menú del salón. Mañana vuelve solo.
+                {soloPlatos ? ' Las bebidas y los postres los marca el salón.' : ''}
+              </small>
+              <Mensaje tipo="error">{error}</Mensaje>
+              {!prods && <small className="suave">Cargando…</small>}
+              {prods && lista.length === 0 && <small className="suave">Todavía no hay productos en el menú.</small>}
 
-          <Mensaje tipo="error">{error}</Mensaje>
+              {lista.length > 0 && (
+                <input
+                  className="campo-chico"
+                  type="search"
+                  placeholder="Buscar producto…"
+                  value={buscar}
+                  onChange={(e) => setBuscar(e.target.value)}
+                />
+              )}
 
-          {!prods && <small className="suave">Cargando…</small>}
-          {prods && lista.length === 0 && <small className="suave">Todavía no hay platos en el menú.</small>}
-
-          {lista.length > 8 && (
-            <input
-              className="campo-chico"
-              type="search"
-              placeholder="Buscar plato…"
-              value={buscar}
-              onChange={(e) => setBuscar(e.target.value)}
-            />
-          )}
-
-          <div style={s.lista}>
-            {visiblesAgotados.length > 0 && (
-              <>
-                <small style={{ ...s.seccion, color: '#B3261E' }}>Agotados hoy</small>
-                {visiblesAgotados.map(fila)}
-              </>
-            )}
-            {secciones.map(({ cat, items }) => (
-              <div key={cat.id} style={{ display: 'grid', gap: 2 }}>
-                <small style={s.seccion}>{cat.nombre}</small>
-                {items.map(fila)}
-              </div>
-            ))}
-            {filtro && visibles.length === 0 && <small className="suave">No encontré ese plato.</small>}
+              {filtro ? (
+                <div style={{ display: 'grid', gap: 2 }}>
+                  {visibles.map(fila)}
+                  {visibles.length === 0 && <small className="suave">No encontré ese producto.</small>}
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {agotados.length > 0 && (
+                    <div style={{ display: 'grid', gap: 2 }}>
+                      <small style={{ ...s.seccion, color: 'var(--rosa-tinta)' }}>Agotados hoy · {agotados.length}</small>
+                      {agotados.map(fila)}
+                    </div>
+                  )}
+                  {grupos.map((g) => {
+                    const abierto = grupoAbierto === g.tipo
+                    const n = g.items.filter((p) => estaAgotado(p, hoy)).length
+                    return (
+                      <div key={g.tipo} style={s.grupo}>
+                        <button
+                          style={s.grupoCab}
+                          aria-expanded={abierto}
+                          onClick={() => {
+                            sentir('toque', 'tic')
+                            setGrupoAbierto(abierto ? null : g.tipo)
+                          }}
+                        >
+                          <b style={{ flex: 1, textAlign: 'left' }}>{TIPOS[g.tipo] ?? g.tipo}</b>
+                          {n > 0 && <span style={s.contador}>{n} agotado{n === 1 ? '' : 's'}</span>}
+                          <small className="suave">{g.items.length}</small>
+                          <span aria-hidden="true" style={{ ...s.flecha, transform: abierto ? 'rotate(180deg)' : 'none' }}>▾</span>
+                        </button>
+                        <Desplegable abierto={abierto}>
+                          <div style={{ display: 'grid', gap: 2, padding: '0 8px 8px' }}>
+                            {g.items.map((p) => fila(p))}
+                          </div>
+                        </Desplegable>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      </Desplegable>
-    </div>
+        </div>,
+        document.body
+      )}
+    </>
   )
 }
 
+const TIPOS = { plato: 'Platos', postre: 'Postres', bebida: 'Bebidas', otro: 'Otros' }
+
 const s = {
-  contenedor: { display: 'grid', gap: 8, marginBottom: 12, justifyItems: 'start' },
-  contador: {
-    marginLeft: 6,
+  globito: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
     minWidth: 20,
-    padding: '0 6px',
+    height: 20,
+    padding: '0 5px',
     borderRadius: 99,
-    background: 'var(--rosa)',
-    color: '#B3261E',
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: '20px',
+    display: 'grid',
+    placeItems: 'center',
+    fontSize: 11,
+    fontWeight: 900,
+    background: 'var(--rosa-tinta)',
+    color: 'var(--sobre-rosa)',
+    border: '2px solid var(--sup)',
   },
-  flecha: { marginLeft: 6, fontSize: 11, transition: 'transform 260ms var(--ease)', display: 'inline-block' },
-  panel: { display: 'grid', gap: 8, padding: 14, width: '100%', boxSizing: 'border-box' },
-  lista: { display: 'grid', gap: 10, maxHeight: 'min(52vh, 420px)', overflowY: 'auto', overscrollBehavior: 'contain', paddingRight: 2 },
+  contador: { padding: '2px 8px', borderRadius: 99, background: 'var(--rosa)', color: 'var(--rosa-tinta)', fontSize: 12, fontWeight: 800 },
+  flecha: { fontSize: 12, transition: 'transform 260ms var(--ease)', display: 'inline-block' },
+  grupo: { border: '1px solid var(--linea)', borderRadius: 16, background: 'var(--lavanda)', overflow: 'hidden' },
+  grupoCab: { all: 'unset', boxSizing: 'border-box', width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '14px 14px', cursor: 'pointer', fontSize: 16 },
   seccion: { fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase', fontSize: 12, color: 'var(--suave)', padding: '4px 2px' },
   fila: { padding: '0 10px', borderRadius: 12 },
   filaAgotada: { background: 'var(--rosa)' },

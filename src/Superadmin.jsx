@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import Admin from './Admin'
 import Anclar from './Anclar'
-import { Cargando, Desplegable, Mensaje } from './ui'
+import Colores from './Colores'
+import { Cargando, Desplegable, Mensaje, Confirmar } from './ui'
 import { avisar, celebrar, sentir, sonar, vibrar } from './feedback'
 
 // Monedas sugeridas. Los campos siguen siendo editables para usar cualquier otra.
@@ -47,6 +48,7 @@ export default function Superadmin() {
   const [error, setError] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [abierto, setAbierto] = useState(null)
+  const [coloresDe, setColoresDe] = useState(null) // id del restaurante cuyos colores se están editando
   const [borrando, setBorrando] = useState(null) // id del restaurante que se está confirmando borrar
   const [claveBorrar, setClaveBorrar] = useState('')
   const [nombreBorrar, setNombreBorrar] = useState('')
@@ -135,7 +137,6 @@ export default function Superadmin() {
 
   function pedirBorrar(r) {
     sentir('aviso')
-    setAbierto(null) // si estaba abierto "Administrar", se cierra para dejar ver la confirmación
     setBorrando(borrando === r.id ? null : r.id)
     setClaveBorrar('')
     setNombreBorrar('')
@@ -185,7 +186,7 @@ export default function Superadmin() {
   const ejemplo = `${form.simbolo} ${(12.5).toFixed(Number(form.decimales) || 0)}`
   // Mientras se administra o se confirma borrar un restaurante, "Crear restaurante" se esconde
   // (encogiéndose, no de golpe) para no competir visualmente con esa tarea.
-  const hayPanelAbierto = abierto !== null || borrando !== null
+  const hayPanelAbierto = abierto !== null
 
   if (!lista) return error ? <Mensaje tipo="error">{error}</Mensaje> : <Cargando filas={2} alto={110} />
 
@@ -266,6 +267,17 @@ export default function Superadmin() {
                 >
                   {abierto === r.id ? 'Cerrar' : 'Administrar'}
                 </button>
+                <button
+                  className={`btn ${coloresDe === r.id ? 'btn-morado' : 'btn-sec'}`}
+                  style={s.accion}
+                  aria-expanded={coloresDe === r.id}
+                  onClick={() => {
+                    sentir('toque')
+                    setColoresDe(coloresDe === r.id ? null : r.id)
+                  }}
+                >
+                  🎨 Colores
+                </button>
                 <button className={`btn ${r.activo ? 'btn-sec' : 'btn-principal'}`} style={s.accion} onClick={() => alternar(r)}>
                   {r.activo ? 'Desactivar' : 'Activar'}
                 </button>
@@ -280,6 +292,10 @@ export default function Superadmin() {
               </div>
             </div>
 
+            <Desplegable abierto={coloresDe === r.id}>
+              <Colores restaurante={r} onGuardado={cargar} />
+            </Desplegable>
+
             <Desplegable abierto={abierto === r.id}>
               <div style={s.panelAdmin}>
                 <Anclar block="start" />
@@ -288,40 +304,27 @@ export default function Superadmin() {
               </div>
             </Desplegable>
 
-            <Desplegable abierto={borrando === r.id}>
-              <div style={s.confirmar}>
-                <Anclar block="center" />
-                <p style={{ margin: 0, fontWeight: 800, color: '#B3261E' }}>Vas a eliminar "{r.nombre}" para siempre</p>
-                <small>
-                  Se borran también su menú, mesas, personal (sus credenciales siguen sirviendo para otros
-                  restaurantes), pedidos y reportes. No se puede deshacer.
-                </small>
-                <label className="etiqueta">
-                  <span>
-                    Para confirmar, escribe el nombre exacto: <b>{r.nombre}</b>
-                  </span>
-                  <input className="campo" value={nombreBorrar} onChange={(e) => setNombreBorrar(e.target.value)} />
-                </label>
-                <label className="etiqueta">
-                  Tu contraseña de superadmin
-                  <input
-                    type="password"
-                    className="campo"
-                    value={claveBorrar}
-                    onChange={(e) => setClaveBorrar(e.target.value)}
-                  />
-                </label>
-                <Mensaje tipo="error">{errorBorrar}</Mensaje>
-                <div style={s.botonesFila}>
-                  <button className="btn btn-sec" style={{ flex: 1 }} onClick={cancelarBorrar} disabled={eliminando}>
-                    Cancelar
-                  </button>
-                  <button className="btn btn-peligro" style={{ flex: 2 }} onClick={() => confirmarBorrar(r)} disabled={eliminando}>
-                    {eliminando ? <span className="puntos">Eliminando</span> : 'Eliminar definitivamente'}
-                  </button>
-                </div>
-              </div>
-            </Desplegable>
+            <Confirmar
+              abierto={borrando === r.id}
+              titulo={`Vas a eliminar "${r.nombre}" para siempre`}
+              texto="Se borran también su menú, mesas, personal (sus credenciales siguen sirviendo para otros restaurantes), pedidos y reportes. No se puede deshacer."
+              textoConfirmar="Eliminar definitivamente"
+              trabajando={eliminando}
+              error={errorBorrar}
+              onCancelar={cancelarBorrar}
+              onConfirmar={() => confirmarBorrar(r)}
+            >
+              <label className="etiqueta">
+                <span>
+                  Para confirmar, escribe el nombre exacto: <b>{r.nombre}</b>
+                </span>
+                <input className="campo" value={nombreBorrar} onChange={(e) => setNombreBorrar(e.target.value)} />
+              </label>
+              <label className="etiqueta">
+                Tu contraseña de superadmin
+                <input type="password" className="campo" value={claveBorrar} onChange={(e) => setClaveBorrar(e.target.value)} />
+              </label>
+            </Confirmar>
           </div>
         )
       })}
@@ -443,7 +446,7 @@ const s = {
   acciones: { display: 'flex', flexWrap: 'wrap', gap: 8, flex: '1 1 300px', justifyContent: 'flex-end' },
   accion: { flex: '1 1 0', minWidth: 96 },
   botonesFila: { display: 'flex', gap: 8, flexWrap: 'wrap' },
-  confirmar: { display: 'grid', gap: 12, border: '1.5px solid #f0a9a3', borderRadius: 18, padding: 16, marginTop: 10, background: '#fff6f5' },
+  confirmar: { display: 'grid', gap: 12, border: '1.5px solid var(--borde-rosa)', borderRadius: 18, padding: 16, marginTop: 10, background: 'var(--rosa)' },
   panelAdmin: { display: 'grid', gap: 12, marginTop: 10, padding: 14, borderRadius: 18, background: 'var(--lavanda)', border: '1px solid var(--lavanda-2)' },
-  panelAdminTitulo: { fontSize: 14, color: '#4B1E4D' },
+  panelAdminTitulo: { fontSize: 14, color: 'var(--marca)' },
 }
