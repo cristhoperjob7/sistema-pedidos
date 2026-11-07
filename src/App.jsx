@@ -8,6 +8,8 @@ import { supabase } from './supabase'
 import Superadmin from './Superadmin'
 import Admin from './Admin'
 import Mesera from './Mesera'
+import Turno from './Turno'
+import CartaPublica, { rutaCarta } from './CartaPublica'
 import Cocina from './Cocina'
 import Estadisticas from './Estadisticas'
 import Login, { NuevaClave, MARCA } from './Login'
@@ -31,7 +33,13 @@ function limpiarDireccion() {
   window.history.replaceState(null, '', window.location.pathname)
 }
 
+// La carta que escanean los clientes no pide iniciar sesión: se decide antes de cargar nada del personal.
 export default function App() {
+  const [carta] = useState(rutaCarta)
+  return carta ? <CartaPublica slug={carta.slug} token={carta.token} /> : <AppPersonal />
+}
+
+function AppPersonal() {
   const [sesion, setSesion] = useState(null)
   const [cargando, setCargando] = useState(true)
   const [enlace] = useState(leerEnlace)
@@ -222,7 +230,11 @@ function Panel({ sesion }) {
         {miembro && !(miembro.rol === 'admin' && ruta === '#/estadisticas') && (
           <div className="aparece">
             {miembro.rol === 'admin' && <Admin restaurante={miembro.restaurantes} conPedidos />}
-            {miembro.rol === 'mesera' && <Mesera restaurante={miembro.restaurantes} />}
+            {miembro.rol === 'mesera' && (
+              <Turno restaurante={miembro.restaurantes}>
+                <Mesera restaurante={miembro.restaurantes} />
+              </Turno>
+            )}
             {miembro.rol === 'cocina' && <Cocina restaurante={miembro.restaurantes} />}
           </div>
         )}

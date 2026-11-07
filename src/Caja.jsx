@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 import { formatear, leerPrecio, soloPrecio } from './moneda'
 import { Cargando, Desplegable, Mensaje, Confirmar } from './ui'
 import { avisar, sentir } from './feedback'
+import { PinCaja } from './Turno'
 
 const hoyEn = (zona) => new Date().toLocaleDateString('en-CA', { timeZone: zona || 'America/Santiago' })
 const esEfectivo = (nombre) => /(efectivo|cash)/i.test(nombre ?? '')
@@ -24,6 +25,10 @@ export default function Caja({ restaurante }) {
   const [confirmar, setConfirmar] = useState(false)
   const [trabajando, setTrabajando] = useState(false)
   const [reabrir, setReabrir] = useState(false)
+  const [turnos, setTurnos] = useState([])
+  const [cerrarTurno, setCerrarTurno] = useState(null)
+  const [contadoTurno, setContadoTurno] = useState('')
+  const [errTurno, setErrTurno] = useState('')
 
   const cargar = useCallback(async () => {
     const [r, h] = await Promise.all([
@@ -37,7 +42,19 @@ export default function Caja({ restaurante }) {
     setError('')
     setRes(r.data)
     setHistorial(h.data ?? [])
-  }, [restaurante.id, dia])
+    const [t, m] = await Promise.all([
+      supabase.from('turnos_caja').select('*').eq('restaurante_id', restaurante.id).order('abierto_en', { ascending: false }).limit(60),
+      supabase.from('miembros').select('usuario_id, nombre').eq('restaurante_id', restaurante.id),
+    ])
+    const nombres = Object.fromEntries((m.data ?? []).map((x) => [x.usuario_id, x.nombre]))
+    const zona = restaurante.zona_horaria || 'America/Santiago'
+    const dDe = (iso) => new Date(iso).toLocaleDateString('en-CA', { timeZone: zona })
+    setTurnos(
+      (t.data ?? [])
+        .filter((x) => x.cerrado_en == null || dDe(x.abierto_en) === dia || dDe(x.cerrado_en) === dia)
+        .map((x) => ({ ...x, nombre: nombres[x.usuario_id] ?? 'Sin nombre' }))
+    )
+  }, [restaurante.id, restaurante.zona_horaria, dia])
 
   useEffect(() => {
     setRes(null)
@@ -54,6 +71,8 @@ export default function Caja({ restaurante }) {
   const propinas = metodos.reduce((n, m) => n + Number(m.propinas), 0)
   const pedidos = metodos.reduce((n, m) => n + Number(m.pedidos), 0)
   const efVentas = metodos.filter((m) => esEfectivo(m.nombre)).reduce((n, m) => n + Number(m.ventas) + Number(m.propinas), 0)
+  const fondoTurnos = turnos.reduce((n, x) => n + Number(x.fondo_inicial), 0)
+  const hayTurnoAbierto = turnos.some((x) => x.cerrado_en == null)
   const fondoN = leerPrecio(fondo || '0', restaurante) ?? 0
   const esperado = fondoN + efVentas
   const contadoN = contado === '' ? null : leerPrecio(contado, restaurante)
@@ -80,6 +99,20 @@ export default function Caja({ restaurante }) {
     setFondo('')
     setContado('')
     setNota('')
+    cargar()
+  }
+
+  async function cerrarTurnoAdmin() {
+    const n = leerPrecio(contadoTurno, restaurante)
+    if (contadoTurno === '' || n == null) return setErrTurno('Escribe el efectivo contado.')
+    setTrabajando(true)
+    setErrTurno('')
+    const { error } = await supabase.rpc('cerrar_turno', { p_turno: cerrarTurno.id, p_contado: n, p_nota: 'Cerrado por administración' })
+    setTrabajando(false)
+    if (error) return setErrTurno(error.message)
+    avisar('Turno cerrado', 'ok')
+    setCerrarTurno(null)
+    setContadoTurno('')
     cargar()
   }
 
@@ -127,12 +160,59 @@ export default function Caja({ restaurante }) {
         </p>
       )}
 
+      {!cierre && hayTurnoAbierto && (
+        <p style={{ margin: 0, padding: '10px 12px', borderRadius: 12, background: 'var(--durazno)', border: '1px solid var(--borde-aviso)', color: 'var(--aviso-tinta)', fontWeight: 700 }}>
+          ⚠️ Hay cajas de meseras sin cerrar. Deben cerrarlas (o cerrarlas tú abajo) para poder cerrar el día.
+        </p>
+      )}
+
       <div style={s.kpis}>
         {tarjeta('Vendido', $(ventas), `${pedidos} pedido${pedidos === 1 ? '' : 's'}`)}
         {tarjeta('Propinas', $(propinas), 'aparte de lo vendido')}
         {tarjeta('En el salón', $(res.ventas_salon))}
         {tarjeta('Para llevar', $(res.ventas_llevar))}
         {Number(res.anulado) > 0 && tarjeta('Anulado', $(res.anulado))}
+      </div>
+
+      <div className="tarjeta" style={{ padding: 14, display: 'grid', gap: 8 }}>
+        <b>Cajas de las meseras</b>
+        {turnos.length === 0 && <small className="suave">Nadie abrió caja este día.</small>}
+        {turnos.map((x) => (
+          <div key={x.id} style={{ display: 'grid', gap: 2, paddingTop: 8, borderTop: '1px solid var(--linea)' }}>
+            <div style={s.fila}>
+              <b>{x.nombre}</b>
+              {x.cerrado_en == null ? (
+                <button className="btn btn-sec btn-chico" onClick={() => { sentir('toque'); setCerrarTurno(x) }}>Cerrar caja</button>
+              ) : (
+                <small style={{ color: colorDif(Number(x.diferencia)), fontWeight: 800 }}>{textoDif(Number(x.diferencia))}</small>
+              )}
+            </div>
+            <small className="suave">
+              {new Date(x.abierto_en).toLocaleTimeString('es-CL', { timeStyle: 'short', timeZone: restaurante.zona_horaria })}
+              {x.cerrado_en ? ` – ${new Date(x.cerrado_en).toLocaleTimeString('es-CL', { timeStyle: 'short', timeZone: restaurante.zona_horaria })}` : ' · abierta'}
+              {' · fondo '}{$(x.fondo_inicial)}
+              {x.cerrado_en ? ` · vendió ${$(x.ventas_total)} · contó ${$(x.efectivo_contado)}` : ''}
+            </small>
+          </div>
+        ))}
+        {fondoTurnos > 0 && !cierre && (
+          <button className="btn btn-sec btn-chico" style={{ justifySelf: 'start' }} onClick={() => setFondo(soloPrecio(String(fondoTurnos), restaurante))}>
+            Usar fondos de las cajas ({$(fondoTurnos)}) como fondo del día
+          </button>
+        )}
+        <Confirmar
+          abierto={!!cerrarTurno}
+          titulo={`Cerrar la caja de ${cerrarTurno?.nombre ?? ''}`}
+          texto="Cuenta el efectivo de esa caja y escríbelo."
+          textoConfirmar="Cerrar caja"
+          peligro={false}
+          trabajando={trabajando}
+          error={errTurno}
+          onCancelar={() => { setCerrarTurno(null); setErrTurno('') }}
+          onConfirmar={cerrarTurnoAdmin}
+        >
+          <input className="campo-chico" inputMode="decimal" placeholder="Efectivo contado" value={contadoTurno} onChange={(e) => setContadoTurno(soloPrecio(e.target.value, restaurante))} />
+        </Confirmar>
       </div>
 
       <div className="tarjeta" style={{ padding: 14, display: 'grid', gap: 8 }}>
@@ -203,7 +283,7 @@ export default function Caja({ restaurante }) {
             <span style={{ fontWeight: 700 }}>Nota (opcional)</span>
             <input className="campo-chico" maxLength={500} placeholder="Ej: se dio vuelto de más en la mesa 4" value={nota} onChange={(e) => setNota(e.target.value)} />
           </label>
-          <button className="btn btn-principal" disabled={res.abiertos > 0 || trabajando} onClick={() => { sentir('toque'); setConfirmar(true) }}>
+          <button className="btn btn-principal" disabled={res.abiertos > 0 || hayTurnoAbierto || trabajando} onClick={() => { sentir('toque'); setConfirmar(true) }}>
             Cerrar caja del día
           </button>
           <Confirmar
@@ -219,6 +299,8 @@ export default function Caja({ restaurante }) {
           />
         </div>
       )}
+
+      <PinCaja restaurante={restaurante} />
 
       {historial.length > 0 && (
         <div className="tarjeta" style={{ padding: 14, display: 'grid', gap: 4 }}>

@@ -6,6 +6,8 @@ import Mesera from './Mesera'
 import Cocina from './Cocina'
 import Reporte from './Reporte'
 import Caja from './Caja'
+import CodigosQR from './CodigosQR'
+import AvisosQR from './AvisosQR'
 import Historial from './Historial'
 import ReporteMensual from './ReporteMensual'
 import Anclar from './Anclar'
@@ -33,6 +35,7 @@ function secciones(conPedidos) {
       items: [
         ['menu', 'Menú', 'libro'],
         ['local', 'Mesas y ajustes', 'mesas'],
+        ['qr', 'Códigos QR', 'qr'],
         ['personal', 'Personal', 'personas'],
       ],
     },
@@ -123,6 +126,7 @@ export default function Admin({ restaurante, scrollAlAbrir = false, conPedidos =
               y el estado del sonido no se reinicien cada vez que se cambia de sección. */}
           {conPedidos && (
             <div className="funde" style={{ display: tab === 'pedidos' ? 'block' : 'none' }}>
+              <AvisosQR restaurante={restaurante} />
               <Mesera restaurante={restaurante} rol="admin" />
             </div>
           )}
@@ -139,6 +143,7 @@ export default function Admin({ restaurante, scrollAlAbrir = false, conPedidos =
               {tab === 'reporte_mes' && conPedidos && <ReporteMensual restaurante={restaurante} />}
               {tab === 'menu' && <Menu restaurante={restaurante} />}
               {tab === 'local' && <Local restaurante={restaurante} />}
+              {tab === 'qr' && <CodigosQR restaurante={restaurante} />}
               {tab === 'personal' && <Personal restaurante={restaurante} />}
             </div>
           )}
