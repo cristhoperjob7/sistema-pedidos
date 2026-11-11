@@ -5,6 +5,7 @@ import { formatear, leerPrecio, soloPrecio } from './moneda'
 import { Cargando, Desplegable, Mensaje, Confirmar } from './ui'
 import { avisar, sentir } from './feedback'
 import { PinCaja } from './Turno'
+import { abrirPDFCaja } from './pdfCaja'
 
 const hoyEn = (zona) => new Date().toLocaleDateString('en-CA', { timeZone: zona || 'America/Santiago' })
 const esEfectivo = (nombre) => /(efectivo|cash)/i.test(nombre ?? '')
@@ -79,6 +80,12 @@ export default function Caja({ restaurante }) {
   const contadoN = contado === '' ? null : leerPrecio(contado, restaurante)
   const diferencia = contadoN == null ? null : contadoN - esperado
 
+  function exportarPDF() {
+    sentir('toque')
+    const ok = abrirPDFCaja({ restaurante, dia, res, turnos, cierre })
+    if (!ok) setError('El navegador bloqueó la ventana del PDF. Permite las ventanas emergentes e inténtalo de nuevo.')
+  }
+
   async function cerrar() {
     setTrabajando(true)
     setError('')
@@ -145,7 +152,12 @@ export default function Caja({ restaurante }) {
     <div style={{ display: 'grid', gap: 14 }}>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
         <h2 style={{ margin: 0 }}>Cierre de caja</h2>
-        <input className="campo-chico" type="date" value={dia} max={hoy} onChange={(e) => e.target.value && setDia(e.target.value)} aria-label="Día" />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input className="campo-chico" type="date" value={dia} max={hoy} onChange={(e) => e.target.value && setDia(e.target.value)} aria-label="Día" />
+          <button className="btn btn-chico btn-sec" onClick={exportarPDF} title="Informe de una hoja para guardar como PDF">
+            <Icono n="recibo" tam={15} className="it" /> Exportar PDF
+          </button>
+        </div>
       </div>
       <small className="suave">{mayus(fechaLarga(dia))}</small>
       <Mensaje tipo="error">{error}</Mensaje>
