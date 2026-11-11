@@ -8,6 +8,7 @@ import Anclar from './Anclar'
 import Icono from './iconos'
 import './orden.css'
 import { esPropio, estaAgotado, hoyEn, useHoy } from './agotado'
+import { ordenarNombre } from './orden'
 
 // Pedidos para llevar: no tienen mesa, se identifican como "Llevar 3" (y el nombre del cliente, si se pidió).
 const esLlevar = (p) => p?.llevar_numero != null
@@ -87,7 +88,7 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
     }
     listosVistos.current = new Set(listos.map((e) => e.id))
 
-    setDatos({ mesas: m.data, cats: c.data, prods: p.data, pagos: mp.data, pedidos: pe.data, items, listos, preparados })
+    setDatos({ mesas: m.data, cats: c.data, prods: ordenarNombre(p.data), pagos: mp.data, pedidos: pe.data, items, listos, preparados })
   }, [restaurante.id])
 
   // Carga inicial + tiempo real: si otro dispositivo cambia un pedido, esta pantalla se actualiza sola.

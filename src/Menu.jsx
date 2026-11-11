@@ -4,6 +4,7 @@ import { formatear, leerPrecio, soloPrecio } from './moneda'
 import Icono from './iconos'
 import { Cargando, Desplegable, Interruptor, Mensaje, Confirmar } from './ui'
 import { avisar, sentir, sonar, vibrar } from './feedback'
+import { ordenarNombre } from './orden'
 
 // Sirve solo para el reporte mensual (separar "platos más vendidos" de "postres favoritos").
 const TIPOS = [
@@ -42,7 +43,7 @@ export default function Menu({ restaurante }) {
     if (c.error || p.error) setError((c.error || p.error).message)
     else {
       setCats(c.data)
-      setProds(p.data)
+      setProds(ordenarNombre(p.data))
     }
   }
 

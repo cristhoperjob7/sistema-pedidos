@@ -35,7 +35,7 @@ function secciones(conPedidos) {
       items: [
         ['menu', 'Menú', 'libro'],
         ['local', 'Mesas y ajustes', 'mesas'],
-        ['qr', 'Códigos QR', 'qr'],
+        ['qr', 'Carta y QR', 'qr'],
         ['personal', 'Personal', 'personas'],
       ],
     },

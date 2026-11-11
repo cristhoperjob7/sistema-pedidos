@@ -5,6 +5,7 @@ import { avisar, sentir, sonar, vibrar } from './feedback'
 import { Desplegable, Interruptor, Mensaje } from './ui'
 import Icono from './iconos'
 import { estaAgotado, marcarPropio, useHoy } from './agotado'
+import { ordenarNombre } from './orden'
 
 // Botón "Agotados" + panel para marcar qué se acabó hoy. Lo usan el Salón y la Cocina.
 // No edita el menú: solo apaga un plato por hoy (mañana vuelve solo).
@@ -37,7 +38,7 @@ export default function Agotados({ restaurante, soloPlatos = false }) {
     }
     setError('')
     setCats(soloPlatos ? c.data.filter((x) => (x.tipo ?? 'plato') === 'plato') : c.data)
-    setProds(p.data)
+    setProds(ordenarNombre(p.data))
   }, [restaurante.id, soloPlatos])
 
   useEffect(() => {

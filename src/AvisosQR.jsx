@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from './supabase'
 import { formatear } from './moneda'
-import { Confirmar, Mensaje } from './ui'
+import { Confirmar, Interruptor, Mensaje } from './ui'
 import { avisar, sentir } from './feedback'
 
 const MIN_VENCE = 45 // minutos que un pedido por confirmar sigue vigente
@@ -21,6 +21,7 @@ export default function AvisosQR({ restaurante }) {
   const [ocupado, setOcupado] = useState(null) // id que se está resolviendo
   const [rechazando, setRechazando] = useState(null)
   const [motivo, setMotivo] = useState('')
+  const [bloquear, setBloquear] = useState(false)
   const [, reloj] = useState(0)
   const vistos = useRef(null) // ids ya conocidos; null en la primera carga para no avisar de golpe
   const temporizador = useRef(null)
@@ -99,7 +100,7 @@ export default function AvisosQR({ restaurante }) {
   async function rechazar() {
     const p = rechazando
     setOcupado(p.id)
-    const { error } = await supabase.rpc('rechazar_pedido_qr', { p_id: p.id, p_motivo: motivo })
+    const { data, error } = await supabase.rpc('rechazar_pedido_qr', { p_id: p.id, p_motivo: motivo, p_bloquear: bloquear })
     setOcupado(null)
     if (error) {
       setError(error.message)
@@ -107,6 +108,15 @@ export default function AvisosQR({ restaurante }) {
     }
     setRechazando(null)
     setMotivo('')
+    setBloquear(false)
+    if (data?.bloqueado) {
+      avisar(
+        data.automatico
+          ? 'Hubo 3 rechazos seguidos: se pausaron los pedidos de esa mesa por 30 min. El admin puede desbloquearla.'
+          : 'Pedidos pausados en esa mesa por 30 min. El admin puede desbloquearla.',
+        'info'
+      )
+    }
     cargar()
   }
 
@@ -177,12 +187,18 @@ export default function AvisosQR({ restaurante }) {
         abierto={!!rechazando}
         titulo="¿Rechazar este pedido?"
         texto="El cliente verá que no se pudo tomar. Puedes dejarle un motivo (opcional)."
-        textoConfirmar="Sí, rechazar"
+        textoConfirmar={bloquear ? 'Rechazar y bloquear' : 'Sí, rechazar'}
         trabajando={!!rechazando && ocupado === rechazando.id}
-        onCancelar={() => { setRechazando(null); setMotivo('') }}
+        onCancelar={() => { setRechazando(null); setMotivo(''); setBloquear(false) }}
         onConfirmar={rechazar}
       >
         <input className="campo-chico" maxLength={200} placeholder="Ej: se acabó la salsa, ¿lo cambiamos?" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
+        <Interruptor checked={bloquear} onChange={setBloquear}>
+          <b>Es una broma: bloquear {rechazando?.mesa_id ? 'esta mesa' : 'los pedidos para llevar'} 30 min</b>
+          <small className="suave" style={{ display: 'block' }}>
+            Nadie podrá pedir desde el celular ahí por un rato. El administrador puede desbloquear cuando quiera.
+          </small>
+        </Interruptor>
       </Confirmar>
     </div>
   )
