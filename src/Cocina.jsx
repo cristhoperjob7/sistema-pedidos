@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import Icono from './iconos'
 import { supabase } from './supabase'
 import { audioCtx, audioDesbloqueado, escucharAudio, sentir } from './feedback'
 import { Cargando, Desplegable, Mensaje } from './ui'
@@ -200,12 +201,12 @@ export default function Cocina({ restaurante }) {
           cualquier toque lo resuelve y el aviso se va solo. */}
       <Desplegable abierto={ajustes.sonido_activo && !audioListo}>
         <p className="nota" style={{ margin: '0 0 12px' }}>
-          🔕 Toca cualquier parte de la pantalla una vez para que suenen los avisos.
+          <Icono n="silencio" tam={15} className="it" /> Toca cualquier parte de la pantalla una vez para que suenen los avisos.
         </p>
       </Desplegable>
       {tickets.length === 0 && (
         <div className="vacio aparece">
-          <span className="vacio-icono">✨</span>
+          <span className="vacio-icono"><Icono n="brillo" tam={34} ancho={1.5} /></span>
           <b>Todo al día</b>
           <span>No hay pedidos pendientes. Los nuevos aparecen aquí solos.</span>
         </div>
@@ -263,7 +264,7 @@ export default function Cocina({ restaurante }) {
             >
               {salida === 'listo' && (
                 <span className="infla" style={s.check} aria-hidden="true">
-                  ✓
+                  <Icono n="check" tam={15} className="it" />
                 </span>
               )}
               <div style={s.titulo}>
@@ -294,7 +295,7 @@ export default function Cocina({ restaurante }) {
               {juntar(t.items_pedido).map((l) => (
                 <p key={`${l.nombre}|${l.nota}`} style={s.linea}>
                   <b>{l.cantidad}×</b> {l.nombre}
-                  {l.nota && <span style={s.nota}>📝 {l.nota}</span>}
+                  {l.nota && <span style={s.nota}><Icono n="nota" tam={15} className="it" /> {l.nota}</span>}
                 </p>
               ))}
               <button className="btn btn-principal btn-grande" style={s.boton} disabled={!!salida} onClick={() => resolver(t, 'listo')}>

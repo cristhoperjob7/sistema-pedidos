@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import Icono from './iconos'
 import { supabase } from './supabase'
 import { formatear, leerPrecio, soloPrecio } from './moneda'
 import { Cargando, Confirmar, Mensaje } from './ui'
@@ -138,11 +139,11 @@ export default function Turno({ restaurante, children }) {
     <div style={{ display: 'grid', gap: 14, maxWidth: 420, margin: '0 auto' }}>
       {resultado && (
         <div className="tarjeta aparece" style={{ padding: 14, display: 'grid', gap: 6 }}>
-          <b>Tu caja quedó cerrada ✓</b>
+          <b>Tu caja quedó cerrada <Icono n="check" tam={15} className="it" /></b>
           <div style={s.fila}><span>Debería haber</span><b>{$(resultado.esperado)}</b></div>
           <div style={s.fila}><span>Contaste</span><b>{$(resultado.contado)}</b></div>
           <p style={{ margin: 0, fontWeight: 800, color: Math.abs(dif) < 0.005 ? 'var(--menta-tinta)' : 'var(--rosa-tinta)' }}>
-            {Math.abs(dif) < 0.005 ? '✓ Cuadra perfecto' : dif > 0 ? `Sobran ${$(dif)}` : `Faltan ${$(-dif)}`}
+            {Math.abs(dif) < 0.005 ? <><Icono n="check" tam={15} className="it" /> Cuadra perfecto</> : dif > 0 ? `Sobran ${$(dif)}` : `Faltan ${$(-dif)}`}
           </p>
         </div>
       )}

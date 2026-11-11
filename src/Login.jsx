@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Icono from './iconos'
 import { supabase } from './supabase'
 import './Login.css'
 import { sentir, sonar, vibrar } from './feedback'
@@ -31,7 +32,7 @@ function Marco({ children }) {
       <aside className="login-foto">
         <div className="login-marca">
           <span className="login-logo" aria-hidden="true">
-            🍽️
+            <Icono n="cubiertos" tam={15} className="it" />
           </span>
           {MARCA}
         </div>
@@ -346,7 +347,7 @@ export function NuevaClave({ onListo }) {
       {listo ? (
         <div className="login-cambia">
           <div className="login-listo" aria-hidden="true">
-            ✓
+            <Icono n="check" tam={15} className="it" />
           </div>
           <h1>Contraseña actualizada</h1>
           <p className="login-sub">Tu nueva contraseña ya está activa.</p>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import Icono from './iconos'
 import { supabase } from './supabase'
 import { formatear } from './moneda'
 import { Cargando, Mensaje, NumeroAnimado, Segmento } from './ui'
@@ -232,13 +233,13 @@ function TiemposCocina({ restaurante, desde, hasta }) {
 
   return (
     <Tarjeta
-      titulo="⏱️ Tiempos de cocina y retiro"
+      titulo={<><Icono n="reloj" tam={16} className="it" /> Tiempos de cocina y retiro</>}
       descripcion="Cuánto tarda cocina en dejar un pedido listo y cuánto espera después en la ventanilla."
     >
       <Mensaje tipo="error">{error}</Mensaje>
       {!r && !error && <Cargando filas={2} alto={70} />}
       {r && r.n === 0 && (
-        <Vacio icono="⏱️" titulo="Todavía no hay datos" texto="Aparecerán cuando cocina marque pedidos como listos en este período." />
+        <Vacio icono={<Icono n="reloj" tam={34} ancho={1.5} />} titulo="Todavía no hay datos" texto="Aparecerán cuando cocina marque pedidos como listos en este período." />
       )}
       {r && r.n > 0 && (
         <>
@@ -399,14 +400,14 @@ function HorasPunta({ restaurante, desde, hasta }) {
 
   return (
     <Tarjeta
-      titulo="🔥 Horas y días punta"
+      titulo={<><Icono n="fuego" tam={16} className="it" /> Horas y días punta</>}
       descripcion="Cuándo se concentra el movimiento, cuánto gasta cada cuenta y cuánto rota cada mesa."
       retraso={80}
     >
       <Mensaje tipo="error">{error}</Mensaje>
       {!r && !error && <Cargando filas={2} alto={70} />}
       {r && r.cuentas === 0 && (
-        <Vacio icono="🔥" titulo="Todavía no hay ventas en este período" texto="Cuando se cobren cuentas, aquí verás tus horas fuertes." />
+        <Vacio icono={<Icono n="fuego" tam={34} ancho={1.5} />} titulo="Todavía no hay ventas en este período" texto="Cuando se cobren cuentas, aquí verás tus horas fuertes." />
       )}
       {r && r.cuentas > 0 && (
         <>
@@ -534,7 +535,7 @@ export default function Estadisticas({ restaurante, onVolver }) {
         </button>
       </div>
       <div className="aparece">
-        <h2 style={{ margin: 0 }}>📊 Estadísticas</h2>
+        <h2 style={{ margin: 0 }}><Icono n="barras" tam={15} className="it" /> Estadísticas</h2>
         <small style={s.suave}>
           {restaurante.nombre} · del {fechaCorta(desde)} al {fechaCorta(hasta)}
         </small>
@@ -566,7 +567,7 @@ export function BotonEstadisticas() {
         if (!nueva) window.location.hash = '#/estadisticas'
       }}
     >
-      <b>📊 Estadísticas avanzadas ↗</b>
+      <b><Icono n="barras" tam={15} className="it" /> Estadísticas avanzadas ↗</b>
       <small style={{ color: 'var(--suave)', fontWeight: 600 }}>Tiempos de cocina, horas punta y más. Se abre en otra pestaña.</small>
     </button>
   )

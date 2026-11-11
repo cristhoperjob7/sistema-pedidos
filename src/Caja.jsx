@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import Icono from './iconos'
 import { supabase } from './supabase'
 import { formatear, leerPrecio, soloPrecio } from './moneda'
 import { Cargando, Desplegable, Mensaje, Confirmar } from './ui'
@@ -151,18 +152,18 @@ export default function Caja({ restaurante }) {
 
       {cierre && (
         <p style={{ margin: 0, padding: '10px 12px', borderRadius: 12, background: 'var(--menta)', border: '1px solid var(--borde-menta)', color: 'var(--menta-tinta)', fontWeight: 800 }}>
-          ✓ Caja cerrada el {new Date(cierre.cerrado_en).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short', timeZone: restaurante.zona_horaria })}
+          <Icono n="check" tam={15} className="it" /> Caja cerrada el {new Date(cierre.cerrado_en).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short', timeZone: restaurante.zona_horaria })}
         </p>
       )}
       {!cierre && res.abiertos > 0 && (
         <p style={{ margin: 0, padding: '10px 12px', borderRadius: 12, background: 'var(--durazno)', border: '1px solid var(--borde-aviso)', color: 'var(--aviso-tinta)', fontWeight: 700 }}>
-          ⚠️ Hay {res.abiertos} cuenta{res.abiertos === 1 ? '' : 's'} abierta{res.abiertos === 1 ? '' : 's'} de este día. Cóbralas o anúlalas para poder cerrar la caja.
+          <Icono n="alerta" tam={15} className="it" /> Hay {res.abiertos} cuenta{res.abiertos === 1 ? '' : 's'} abierta{res.abiertos === 1 ? '' : 's'} de este día. Cóbralas o anúlalas para poder cerrar la caja.
         </p>
       )}
 
       {!cierre && hayTurnoAbierto && (
         <p style={{ margin: 0, padding: '10px 12px', borderRadius: 12, background: 'var(--durazno)', border: '1px solid var(--borde-aviso)', color: 'var(--aviso-tinta)', fontWeight: 700 }}>
-          ⚠️ Hay cajas de meseras sin cerrar. Deben cerrarlas (o cerrarlas tú abajo) para poder cerrar el día.
+          <Icono n="alerta" tam={15} className="it" /> Hay cajas de meseras sin cerrar. Deben cerrarlas (o cerrarlas tú abajo) para poder cerrar el día.
         </p>
       )}
 
@@ -276,7 +277,7 @@ export default function Caja({ restaurante }) {
           </label>
           {diferencia != null && (
             <p className="aparece" style={{ margin: 0, fontWeight: 800, color: colorDif(diferencia) }}>
-              {Math.abs(diferencia) < 0.005 ? '✓ ' : '⚠️ '}{textoDif(diferencia)}
+              {Math.abs(diferencia) < 0.005 ? <><Icono n="check" tam={15} className="it" /></> : <><Icono n="alerta" tam={15} className="it" /></>}{textoDif(diferencia)}
             </p>
           )}
           <label style={{ display: 'grid', gap: 4 }}>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Icono from './iconos'
 import { supabase } from './supabase'
 import { Mensaje } from './ui'
 import { avisar, sentir } from './feedback'
@@ -112,7 +113,7 @@ export default function Colores({ restaurante, onGuardado }) {
 
       {avisos.map((a) => (
         <p key={a} role="status" style={{ margin: 0, padding: '10px 12px', borderRadius: 12, background: 'var(--durazno)', border: '1px solid var(--borde-aviso)', color: 'var(--aviso-tinta)', fontSize: 14, fontWeight: 700 }}>
-          ⚠️ {a}
+          <Icono n="alerta" tam={15} className="it" /> {a}
         </p>
       ))}
 

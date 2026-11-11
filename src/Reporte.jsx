@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import Icono from './iconos'
 import { supabase } from './supabase'
 import { formatear } from './moneda'
 import { Cargando, Mensaje, NumeroAnimado } from './ui'
@@ -13,10 +14,10 @@ function hoyEn(zona) {
 // Para separar "lo más vendido" según el Tipo de cada categoría (se edita en el Menú).
 // Así un restaurante de helados ve "Postres más vendidos" y no "Platos más vendidos".
 const TIPOS_INFO = {
-  plato: { icono: '🍽️', titulo: 'Platos más vendidos' },
-  postre: { icono: '🍰', titulo: 'Postres más vendidos' },
-  bebida: { icono: '🥤', titulo: 'Bebidas más vendidas' },
-  otro: { icono: '📦', titulo: 'Otros más vendidos' },
+  plato: { icono: 'cubiertos', titulo: 'Platos más vendidos' },
+  postre: { icono: 'postre', titulo: 'Postres más vendidos' },
+  bebida: { icono: 'bebida', titulo: 'Bebidas más vendidas' },
+  otro: { icono: 'paquete', titulo: 'Otros más vendidos' },
 }
 const ORDEN_TIPOS = ['plato', 'postre', 'bebida', 'otro']
 
@@ -182,7 +183,7 @@ export default function Reporte({ restaurante }) {
             return (
               <div key={tipo}>
                 <h4 style={s.titulo}>
-                  {info.icono} {info.titulo}
+                  <Icono n={info.icono} tam={16} className="it" /> {info.titulo}
                 </h4>
                 <div className="tarjeta" style={s.barras}>
                   {lista.map(([nombre, cantidad], i) => (

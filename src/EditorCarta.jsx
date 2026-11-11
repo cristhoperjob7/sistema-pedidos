@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import Icono from './iconos'
 import { supabase } from './supabase'
 import { Cargando, Confirmar, Interruptor, Mensaje } from './ui'
 import { avisar, sentir } from './feedback'
@@ -245,7 +246,7 @@ export default function EditorCarta({ restaurante, urlPrueba }) {
                     style={{ position: 'absolute', top: 4, right: 4, width: 28, height: 28, padding: 0 }}
                     onClick={() => { quitar(u); cambiarEn('galeria', { fotos: l.galeria.fotos.filter((x) => x !== u) }) }}
                   >
-                    ✕
+                    <Icono n="cerrar" tam={15} className="it" />
                   </button>
                 </div>
               ))}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Icono from './iconos'
 import { supabase } from './supabase'
 import Campo from './Campo'
 import { Cargando, Desplegable, Interruptor, Mensaje, Confirmar } from './ui'
@@ -147,7 +148,7 @@ export default function Local({ restaurante }) {
         </div>
         {mesas.length === 0 && (
           <div className="vacio">
-            <span className="vacio-icono">🪑</span>
+            <span className="vacio-icono"><Icono n="silla" tam={34} ancho={1.5} /></span>
             <b>No hay mesas</b>
             <span>Agrega la primera con el botón de abajo.</span>
           </div>

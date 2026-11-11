@@ -215,7 +215,7 @@ function Panel({ sesion }) {
 
         {perfil && !perfil.es_superadmin && !miembro && (
           <div className="vacio aparece">
-            <span className="vacio-icono">🔑</span>
+            <span className="vacio-icono"><Icono n="llave" tam={34} ancho={1.5} /></span>
             <b>Tu usuario no tiene un restaurante activo asignado.</b>
             <span>Pídele al administrador que revise tu acceso.</span>
           </div>

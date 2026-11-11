@@ -84,7 +84,7 @@ export default function PlatosCarta({ restaurante }) {
                 <b style={{ display: 'block', overflowWrap: 'anywhere' }}>{p.nombre}</b>
                 <small className="suave">{$(p.precio)}{p.descripcion ? ' · con descripción' : ''}</small>
                 <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
-                  {p.destacado && <span style={s.chip}>★ Destacado</span>}
+                  {p.destacado && <span style={s.chip}><Icono n="estrella" tam={15} className="it" /> Destacado</span>}
                   {p.en_carta === false && <span style={{ ...s.chip, background: 'var(--rosa)', color: 'var(--rosa-tinta)' }}>Oculto en la carta</span>}
                 </span>
               </span>
@@ -246,7 +246,7 @@ function HojaPlato({ restaurante, plato, onCerrar, onCambio }) {
           </label>
 
           <Interruptor checked={destacado} onChange={setDestacado}>
-            <b>★ Destacado</b>
+            <b><Icono n="estrella" tam={15} className="it" /> Destacado</b>
             <small className="suave" style={{ display: 'block' }}>Sale primero en su categoría y con una etiqueta.</small>
           </Interruptor>
           <Interruptor checked={enCarta} onChange={setEnCarta}>

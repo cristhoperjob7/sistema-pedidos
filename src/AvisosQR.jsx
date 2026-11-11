@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import Icono from './iconos'
 import { supabase } from './supabase'
 import { formatear } from './moneda'
 import { Confirmar, Interruptor, Mensaje } from './ui'
@@ -132,7 +133,7 @@ export default function AvisosQR({ restaurante }) {
   if (pedidos.length === 0 && llamados.length === 0 && !error) return null
 
   const nombreMesa = (x) =>
-    x.mesa_id ? `Mesa ${x.mesas?.numero ?? '?'}${x.mesas?.nombre ? ` · ${x.mesas.nombre}` : ''}` : `🥡 Para llevar · ${x.cliente ?? ''}`
+    x.mesa_id ? `Mesa ${x.mesas?.numero ?? '?'}${x.mesas?.nombre ? ` · ${x.mesas.nombre}` : ''}` : <><Icono n="bolsa" tam={15} className="it" /> Para llevar · {x.cliente ?? ''}</>
 
   return (
     <div className="aparece" style={{ display: 'grid', gap: 10, marginBottom: 12 }}>
@@ -141,7 +142,7 @@ export default function AvisosQR({ restaurante }) {
       {llamados.map((l) => (
         <div key={l.id} style={s.llamado}>
           <span style={{ minWidth: 0 }}>
-            <b>{l.tipo === 'cuenta' ? '🧾 Pide la cuenta' : '🔔 Te llaman'}</b>
+            <b>{l.tipo === 'cuenta' ? <><Icono n="recibo" tam={15} className="it" /> Pide la cuenta</> : <><Icono n="timbre" tam={15} className="it" /> Te llaman</>}</b>
             <small style={{ display: 'block' }}>
               {nombreMesa(l)} · {hace(l.creado_en)}
             </small>
@@ -155,7 +156,7 @@ export default function AvisosQR({ restaurante }) {
       {pedidos.map((p) => (
         <div key={p.id} className="tarjeta" style={{ padding: 12, display: 'grid', gap: 8, borderColor: 'var(--borde-aviso)' }}>
           <div style={s.fila}>
-            <b>📲 Pedido por confirmar · {nombreMesa(p)}</b>
+            <b><Icono n="qr" tam={15} className="it" /> Pedido por confirmar · {nombreMesa(p)}</b>
             <small className="suave">{hace(p.creado_en)}</small>
           </div>
           <div style={{ display: 'grid', gap: 2 }}>

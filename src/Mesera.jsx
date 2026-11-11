@@ -273,7 +273,7 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
           setVista({ nombre: 'llevar', llevarId: null })
         }}
       >
-        🥡 Pedido para llevar
+        <Icono n="bolsa" tam={15} className="it" /> Pedido para llevar
       </button>
       {mesasVisibles.length > 1 && (
         <button
@@ -284,7 +284,7 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
             setJuntando(true)
           }}
         >
-          🔗 Juntar mesas
+          <Icono n="enlace" tam={15} className="it" /> Juntar mesas
         </button>
       )}
       {juntando && (
@@ -304,7 +304,7 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
 
       {llevarAbiertos.length > 0 && (
         <div style={{ marginBottom: 14 }}>
-          <h3 style={{ margin: '0 0 8px', fontSize: 16 }}>🥡 Para llevar</h3>
+          <h3 style={{ margin: '0 0 8px', fontSize: 16 }}><Icono n="bolsa" tam={15} className="it" /> Para llevar</h3>
           <div style={s.grid}>
             {llevarAbiertos.map((p, i) => {
               const its = itemsPorPedido.get(p.id) ?? []
@@ -326,7 +326,7 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
                     }}
                   >
                     <span style={s.mesaArriba}>
-                      <b style={{ fontSize: 24, lineHeight: 1 }}>🥡 {p.llevar_numero}</b>
+                      <b style={{ fontSize: 24, lineHeight: 1 }}><Icono n="bolsa" tam={15} className="it" /> {p.llevar_numero}</b>
                       <span
                         key={String(!!lista)}
                         className="contador-pop"
@@ -340,7 +340,7 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
                       className={lista || porCobrar ? 'contador-pop' : undefined}
                       style={{ fontWeight: 800, fontSize: 14, color: lista ? 'var(--menta-tinta)' : porCobrar ? 'var(--marca)' : 'var(--aviso-tinta)' }}
                     >
-                      {lista ? '🔔 Lista' : porCobrar ? '💳 Por cobrar' : 'En preparación'}
+                      {lista ? <><Icono n="timbre" tam={15} className="it" /> Lista</> : porCobrar ? <><Icono n="tarjeta" tam={15} className="it" /> Por cobrar</> : 'En preparación'}
                     </span>
                     <small className="suave" style={{ lineHeight: 1.3 }}>
                       {`#${p.numero} · ${its.reduce((n, x) => n + x.cantidad, 0)} ítems · ${formatear(p.total, restaurante)}`}
@@ -349,7 +349,7 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
                   <Desplegable abierto={!!lista || porCobrar}>
                     {lista ? (
                       <button className="btn btn-principal btn-chico btn-bloque" style={{ marginTop: 6 }} onClick={() => entregar(p, true)}>
-                        ✓ Entregar y cobrar
+                        <Icono n="check" tam={15} className="it" /> Entregar y cobrar
                       </button>
                     ) : (
                       <button
@@ -360,7 +360,7 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
                           setVista({ nombre: 'cobrar', llevarId: p.id })
                         }}
                       >
-                        💳 Cobrar
+                        <Icono n="tarjeta" tam={15} className="it" /> Cobrar
                       </button>
                     )}
                   </Desplegable>
@@ -371,10 +371,10 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
         </div>
       )}
 
-      {datos.mesas.length > 0 && llevarAbiertos.length > 0 && <h3 style={{ margin: '0 0 8px', fontSize: 16 }}>🍽️ Mesas</h3>}
+      {datos.mesas.length > 0 && llevarAbiertos.length > 0 && <h3 style={{ margin: '0 0 8px', fontSize: 16 }}><Icono n="cubiertos" tam={15} className="it" /> Mesas</h3>}
       {datos.mesas.length === 0 && (
         <div className="vacio">
-          <span className="vacio-icono">🪑</span>
+          <span className="vacio-icono"><Icono n="silla" tam={34} ancho={1.5} /></span>
           <b>No hay mesas activas</b>
           <span>El administrador puede agregarlas en “Mesas y ajustes”.</span>
         </div>
@@ -419,7 +419,7 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
                   className={lista ? 'contador-pop' : undefined}
                   style={{ fontWeight: 800, fontSize: 14, color: lista ? 'var(--menta-tinta)' : ocupada ? 'var(--aviso-tinta)' : 'var(--menta-tinta)' }}
                 >
-                  {lista ? `🔔 Lista${listaLlevar ? ' · para llevar' : ''}` : p ? 'Ocupada' : grupo.length > 0 ? '🔗 Juntas' : 'Libre'}
+                  {lista ? <><Icono n="timbre" tam={15} className="it" /> Lista{listaLlevar ? ' · para llevar' : ''}</> : p ? 'Ocupada' : grupo.length > 0 ? <><Icono n="enlace" tam={15} className="it" /> Juntas</> : 'Libre'}
                 </span>
                 <small className="suave" style={{ lineHeight: 1.3 }}>
                   {grupo.length > 0 && !p
@@ -436,7 +436,7 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
                   style={{ marginTop: 6 }}
                   onClick={() => entregar(p)}
                 >
-                  ✓ Entregado
+                  <Icono n="check" tam={15} className="it" /> Entregado
                 </button>
               </Desplegable>
             </div>
@@ -512,7 +512,7 @@ function JuntarMesas({ datos, principal, miembros, pedidoPorMesa, onCerrar, onHe
                   <span key={m.id} className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                     Mesa {m.numero}
                     <button style={{ all: 'unset', cursor: 'pointer', fontWeight: 900 }} disabled={trabajando} aria-label={`Quitar la mesa ${m.numero}`} onClick={() => quitar(m)}>
-                      ✕
+                      <Icono n="cerrar" tam={15} className="it" />
                     </button>
                   </span>
                 ))}
@@ -548,7 +548,7 @@ function JuntarMesas({ datos, principal, miembros, pedidoPorMesa, onCerrar, onHe
                   }}
                 >
                   <b style={{ fontSize: 22 }}>{m.numero}</b>
-                  <small>{on ? '✓' : 'Libre'}</small>
+                  <small>{on ? <><Icono n="check" tam={15} className="it" /></> : 'Libre'}</small>
                 </button>
               )
             })}
@@ -808,7 +808,7 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
             ‹ Mesas
           </button>
           <h2 style={{ margin: 0, minWidth: 0, overflowWrap: 'anywhere' }}>
-            {esLlevarVista ? '🥡 ' : ''}
+            {esLlevarVista ? <><Icono n="bolsa" tam={15} className="it" /></> : ''}
             {rotulo}
             {!esLlevarVista && mesa.nombre ? <span className="suave" style={{ fontWeight: 600 }}> · {mesa.nombre}</span> : ''}
           </h2>
@@ -821,7 +821,7 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
                   setJuntando(true)
                 }}
               >
-                🔗 Juntar
+                <Icono n="enlace" tam={15} className="it" /> Juntar
               </button>
               {!!pedido && (
                 <button
@@ -834,7 +834,7 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
                     setMoviendo(true)
                   }}
                 >
-                  ⇄ Cambiar
+                  <Icono n="enlace" tam={15} className="it" /> Cambiar
                 </button>
               )}
             </div>
@@ -847,14 +847,14 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
         <Desplegable abierto={!!listos?.length}>
           <div style={s.bannerListo}>
             <span style={{ flex: 1, minWidth: 150 }}>
-              <b>🔔 Pedido listo para retirar</b>
+              <b><Icono n="timbre" tam={15} className="it" /> Pedido listo para retirar</b>
               <br />
               <small className="suave">
                 {esLlevarVista ? 'El cliente ya puede retirarlo.' : listos?.some((e) => e.modalidad === 'llevar') ? 'Incluye pedido para llevar.' : 'Cocina ya lo dejó en la ventanilla.'}
               </small>
             </span>
             <button className="btn btn-principal" onClick={onEntregar}>
-              {esLlevarVista ? '✓ Entregar y cobrar' : '✓ Entregado'}
+              {esLlevarVista ? <><Icono n="check" tam={15} className="it" /> Entregar y cobrar</> : <><Icono n="check" tam={15} className="it" /> Entregado</>}
             </button>
           </div>
         </Desplegable>
@@ -878,7 +878,7 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
 
         {datos.cats.length === 0 && (
           <div className="vacio">
-            <span className="vacio-icono">📋</span>
+            <span className="vacio-icono"><Icono n="lista" tam={34} ancho={1.5} /></span>
             <b>El menú está vacío</b>
             <span>El administrador puede cargarlo en la pestaña “Menú”.</span>
           </div>
@@ -905,7 +905,7 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
                   <b style={{ display: 'block' }}>{p.nombre}</b>
                   {sinStock ? (
                     <span className="infla" style={s.etiquetaAgotado}>
-                      🚫 Se agotó · quítalo del pedido
+                      <Icono n="prohibido" tam={15} className="it" /> Se agotó · quítalo del pedido
                     </span>
                   ) : (
                     <small className="suave">{formatear(p.precio, restaurante)}</small>
@@ -934,7 +934,7 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
         </div>
         {datos.cats.length > 0 && prodsCat.length === 0 && (
           <p className="nota aparece">
-            {soloAgotados ? '🚫 Todo lo de esta categoría está agotado por hoy.' : 'Esta categoría no tiene productos activos.'}
+            {soloAgotados ? <><Icono n="prohibido" tam={15} className="it" /> Todo lo de esta categoría está agotado por hoy.</> : 'Esta categoría no tiene productos activos.'}
           </p>
         )}
       </div>
@@ -1062,7 +1062,7 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
 
               {unidades === 0 && (
                 <div className="vacio">
-                  <span className="vacio-icono">📝</span>
+                  <span className="vacio-icono"><Icono n="nota" tam={34} ancho={1.5} /></span>
                   <b>La orden está vacía</b>
                   <span>Vuelve y toca “+” en los productos.</span>
                 </div>
@@ -1082,7 +1082,7 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
                           <b style={{ display: 'block' }}>{p.nombre}</b>
                           {sinStock ? (
                             <span className="infla" style={s.etiquetaAgotado}>
-                              🚫 Se agotó · quítalo con −
+                              <Icono n="prohibido" tam={15} className="it" /> Se agotó · quítalo con −
                             </span>
                           ) : (
                             <small className="suave">{formatear(x.n * Number(p.precio), restaurante)}</small>
@@ -1120,7 +1120,7 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
                               onMouseDown={(e) => e.preventDefault()}
                               onClick={() => empezarNota(p, 'Sin')}
                             >
-                              ➖ Sin…
+                              <Icono n="menos" tam={15} className="it" /> Sin…
                             </button>
                             <button
                               type="button"
@@ -1128,7 +1128,7 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
                               onMouseDown={(e) => e.preventDefault()}
                               onClick={() => empezarNota(p, 'Agregar')}
                             >
-                              ➕ Agregar…
+                              <Icono n="mas" tam={15} className="it" /> Agregar…
                             </button>
                           </div>
                           <div style={{ display: 'flex', gap: 8 }}>
@@ -1154,7 +1154,7 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
                             setEditandoNota(p.id)
                           }}
                         >
-                          {nota ? `📝 ${nota}` : '✎ Agregar nota (sin cebolla, extra queso…)'}
+                          {nota ? <><Icono n="nota" tam={15} className="it" /> {nota}</> : <><Icono n="lapiz" tam={15} className="it" /> Agregar nota (sin cebolla, extra queso…)</>}
                         </button>
                       )}
                     </div>
@@ -1180,15 +1180,15 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
                       </span>{' '}
                       × {g.nombre}
                     </b>
-                    {g.nota && <span style={s.notaChip}>📝 {g.nota}</span>}
+                    {g.nota && <span style={s.notaChip}><Icono n="nota" tam={15} className="it" /> {g.nota}</span>}
                     {g.preparado > 0 && (
                       <span style={s.preparadoChip}>
-                        🍳 {g.preparado === g.cantidad ? 'Ya preparado' : `${g.preparado} ya preparado${g.preparado === 1 ? '' : 's'}`}
+                        <Icono n="gorro" tam={15} className="it" /> {g.preparado === g.cantidad ? 'Ya preparado' : `${g.preparado} ya preparado${g.preparado === 1 ? '' : 's'}`}
                       </span>
                     )}
                     <br />
                     <small className="suave">
-                      {g.va_a_cocina ? '🍳 En cocina' : 'No va a cocina'}
+                      {g.va_a_cocina ? <><Icono n="gorro" tam={15} className="it" /> En cocina</> : 'No va a cocina'}
                       {g.llevar > 0 ? ` · ${g.llevar === g.cantidad ? 'para llevar' : `${g.llevar} para llevar`}` : ''} ·{' '}
                       {formatear(g.total, restaurante)}
                     </small>
@@ -1334,7 +1334,7 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
                       Volver
                     </button>
                     <button className="btn btn-principal" style={{ flex: 1 }} disabled={trabajando || !nombreCliente.trim()}>
-                      {trabajando ? <span className="puntos">Enviando</span> : hayCocina ? '🍳 Enviar a cocina' : 'Añadir al pedido'}
+                      {trabajando ? <span className="puntos">Enviando</span> : hayCocina ? <><Icono n="gorro" tam={15} className="it" /> Enviar a cocina</> : 'Añadir al pedido'}
                     </button>
                   </div>
                 </form>
@@ -1348,8 +1348,8 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
                     valor={llevar}
                     onChange={setLlevar}
                     opciones={[
-                      [false, '🍽️ Servir'],
-                      [true, '🥡 Para llevar'],
+                      [false, <><Icono n="cubiertos" tam={15} className="it" /> Servir</>],
+                      [true, <><Icono n="bolsa" tam={15} className="it" /> Para llevar</>],
                     ]}
                   />
                 </div>
@@ -1357,7 +1357,7 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
 
               {hayAgotadoEnEnvio && (
                 <p className="nota aparece">
-                  🚫 Se agotó: {lineasPend.filter((x) => agotado(x.prod)).map((x) => x.prod.nombre).join(', ')}. Quítalo (con −) para poder
+                  <Icono n="prohibido" tam={15} className="it" /> Se agotó: {lineasPend.filter((x) => agotado(x.prod)).map((x) => x.prod.nombre).join(', ')}. Quítalo (con −) para poder
                   enviar la orden.
                 </p>
               )}
@@ -1369,7 +1369,7 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
                   </button>
                   {lineasPend.length > 0 ? (
                     <button className="btn btn-principal" style={{ flex: '2 1 190px', minHeight: 50 }} disabled={!hayParaEnviar || trabajando} onClick={confirmar}>
-                      {trabajando && hayParaEnviar ? <span className="puntos">Enviando</span> : hayCocina ? '🍳 Enviar a cocina' : 'Añadir al pedido'}
+                      {trabajando && hayParaEnviar ? <span className="puntos">Enviando</span> : hayCocina ? <><Icono n="gorro" tam={15} className="it" /> Enviar a cocina</> : 'Añadir al pedido'}
                     </button>
                   ) : (
                     <button
@@ -1443,7 +1443,7 @@ function Cobrar({ restaurante, datos, mesa, pedido, items, onVolver, onListo }) 
   if (!pedido) {
     return (
       <div className="vacio aparece">
-        <span className="vacio-icono">🧾</span>
+        <span className="vacio-icono"><Icono n="recibo" tam={34} ancho={1.5} /></span>
         <b>Esta cuenta ya no está abierta.</b>
         <button className="btn btn-sec" onClick={onListo}>
           Volver a las mesas

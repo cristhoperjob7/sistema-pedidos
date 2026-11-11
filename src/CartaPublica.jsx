@@ -263,7 +263,7 @@ export default function CartaPublica({ slug, token }) {
     return (
       <div style={s.centro}>
         <div className="tarjeta aparece" style={{ padding: 24, display: 'grid', gap: 12, textAlign: 'center' }}>
-          <div style={{ fontSize: 46 }}>🙏</div>
+          <div style={{ color: 'var(--marca)' }}><Icono n="corazon" tam={46} ancho={1.5} /></div>
           <h2 style={{ margin: 0 }}>¡Gracias por tu visita!</h2>
           <p className="suave" style={{ margin: 0 }}>Tu cuenta ya está pagada. ¡Esperamos verte pronto en {rest.nombre}!</p>
           <button
@@ -288,7 +288,7 @@ export default function CartaPublica({ slug, token }) {
     return (
       <div style={s.centro}>
         <div className="tarjeta aparece" style={{ padding: 22, display: 'grid', gap: 12, textAlign: 'center' }}>
-          <div style={{ fontSize: 44 }}>{pendiente ? '⏳' : ok ? '✅' : e === 'rechazado' ? '🙁' : '⌛'}</div>
+          <div style={{ color: 'var(--marca)' }}><Icono n={pendiente ? 'arena' : ok ? 'circulocheck' : 'alerta'} tam={44} ancho={1.5} /></div>
           <h2 style={{ margin: 0 }}>
             {pendiente && 'Esperando confirmación'}
             {ok && '¡Pedido confirmado!'}
@@ -327,7 +327,7 @@ export default function CartaPublica({ slug, token }) {
   const hayPortada = fotoOk(L.portada)
   const completa = hayPortada && L.portada_modo === 'completa'
   const velo = Math.min(0.7, Math.max(0, Number(L.portada_vel ?? 30) / 100))
-  const rotulo = carta.llevar ? '🥡 Pedido para llevar' : `Mesa ${carta.mesa?.numero}${carta.mesa?.nombre ? ` · ${carta.mesa.nombre}` : ''}`
+  const rotulo = carta.llevar ? <><Icono n="bolsa" tam={15} className="it" /> Pedido para llevar</> : `Mesa ${carta.mesa?.numero}${carta.mesa?.nombre ? ` · ${carta.mesa.nombre}` : ''}`
 
   const digitos = (t) => String(t ?? '').replace(/\D/g, '')
   const wa = digitos(info?.whatsapp)
@@ -364,10 +364,10 @@ export default function CartaPublica({ slug, token }) {
             <button className="cp-boton cp-boton-fuerte" onClick={irCarta}>Ver la carta</button>
             {!carta.llevar && (
               <>
-                <button className="cp-boton" disabled={enfriando} onClick={() => llamar('mesera')}>🔔 Llamar a la mesera</button>
+                <button className="cp-boton" disabled={enfriando} onClick={() => llamar('mesera')}><Icono n="timbre" tam={15} className="it" /> Llamar a la mesera</button>
                 {mesaEstado.cuenta_abierta && (
                   <button className="cp-boton" disabled={enfriando || mesaEstado.cuenta_pedida} onClick={() => llamar('cuenta')}>
-                    {mesaEstado.cuenta_pedida ? '✓ Cuenta solicitada' : '🧾 Pedir la cuenta'}
+                    {mesaEstado.cuenta_pedida ? <><Icono n="check" tam={15} className="it" /> Cuenta solicitada</> : <><Icono n="recibo" tam={15} className="it" /> Pedir la cuenta</>}
                   </button>
                 )}
               </>
@@ -427,7 +427,7 @@ export default function CartaPublica({ slug, token }) {
                 return (
                   <article key={p.id} className={`cp-plato${p.agotado ? ' agotado' : ''}`}>
                     <div className="cp-plato-txt">
-                      {p.destacado && !p.agotado ? <span className="cp-star">★ Destacado</span> : null}
+                      {p.destacado && !p.agotado ? <span className="cp-star"><Icono n="estrella" tam={15} className="it" /> Destacado</span> : null}
                       <h4>{p.nombre}</h4>
                       {p.descripcion ? <p>{p.descripcion}</p> : null}
                       <div className="cp-plato-pie">
@@ -486,24 +486,24 @@ export default function CartaPublica({ slug, token }) {
           <h2 className="cp-titulo">Visítanos</h2>
           <div className="cp-info">
             {info.horario ? (
-              <div><span>🕒 Horario</span><p style={{ whiteSpace: 'pre-line' }}>{info.horario}</p></div>
+              <div><span><Icono n="reloj" tam={15} className="it" /> Horario</span><p style={{ whiteSpace: 'pre-line' }}>{info.horario}</p></div>
             ) : null}
             {info.direccion ? (
               <div>
-                <span>📍 Dirección</span>
+                <span><Icono n="pin" tam={15} className="it" /> Dirección</span>
                 <p>{info.direccion}</p>
                 <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(info.direccion)}`} target="_blank" rel="noreferrer">Cómo llegar</a>
               </div>
             ) : null}
             {(tel || wa || insta) && (
               <div className="cp-links">
-                {tel ? <a href={`tel:+${tel}`}>📞 Llamar</a> : null}
-                {wa ? <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer">💬 WhatsApp</a> : null}
-                {insta ? <a href={`https://instagram.com/${insta}`} target="_blank" rel="noreferrer">📷 @{insta}</a> : null}
+                {tel ? <a href={`tel:+${tel}`}><Icono n="telefono" tam={15} className="it" /> Llamar</a> : null}
+                {wa ? <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer"><Icono n="chat" tam={15} className="it" /> WhatsApp</a> : null}
+                {insta ? <a href={`https://instagram.com/${insta}`} target="_blank" rel="noreferrer"><Icono n="camara" tam={15} className="it" /> @{insta}</a> : null}
               </div>
             )}
             {info.wifi_red ? (
-              <div><span>📶 Wi‑Fi</span><p>{info.wifi_red}{info.wifi_clave ? ` · clave: ${info.wifi_clave}` : ''}</p></div>
+              <div><span><Icono n="wifi" tam={15} className="it" /> Wi‑Fi</span><p>{info.wifi_red}{info.wifi_clave ? ` · clave: ${info.wifi_clave}` : ''}</p></div>
             ) : null}
           </div>
         </section>
@@ -523,7 +523,7 @@ export default function CartaPublica({ slug, token }) {
       {zoom && createPortal(
         <div className="cp-zoom" onClick={() => setZoom(null)} role="dialog" aria-modal="true" aria-label="Foto">
           <img src={zoom} alt="" />
-          <button aria-label="Cerrar" onClick={() => setZoom(null)}>✕</button>
+          <button aria-label="Cerrar" onClick={() => setZoom(null)}><Icono n="cerrar" tam={15} className="it" /></button>
         </div>,
         document.body
       )}
@@ -591,7 +591,7 @@ const CSS = `
 .cp{background:var(--fondo);color:var(--tinta);min-height:100dvh;padding-bottom:calc(96px + var(--seguro-abajo,0px))}
 .cp-wrap{max-width:720px;margin:0 auto;padding:0 18px}
 .cp-seccion{padding-top:34px}
-.cp-titulo{font-family:Georgia,'Times New Roman',serif;font-size:27px;line-height:1.15;margin:0 0 12px}
+.cp-titulo{font-family:'Fraunces',Georgia,'Times New Roman',serif;font-size:27px;line-height:1.15;margin:0 0 12px}
 .cp-suave{color:var(--suave);margin:0 0 8px;font-size:15px}
 .cp-hero{position:relative;overflow:hidden;min-height:min(80svh,600px);display:grid;align-items:end;background:linear-gradient(160deg,color-mix(in srgb,var(--marca) 60%,var(--fondo)),var(--fondo) 85%);color:#fff}
 .cp-hero-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
@@ -602,7 +602,7 @@ const CSS = `
 .cp-marco{width:auto;max-width:min(100%,600px);max-height:46svh;object-fit:contain;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.5)}
 .cp-hero-in{position:relative;max-width:720px;width:100%;margin:0 auto;padding:56px 18px 30px;display:grid;gap:12px;justify-items:center;text-align:center}
 .cp-logo{max-height:84px;max-width:200px;object-fit:contain;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4))}
-.cp-hero h1{margin:0;font-family:Georgia,'Times New Roman',serif;font-size:clamp(34px,9vw,52px);line-height:1.05;text-shadow:0 2px 14px rgba(0,0,0,.55);overflow-wrap:anywhere}
+.cp-hero h1{margin:0;font-family:'Fraunces',Georgia,'Times New Roman',serif;font-size:clamp(34px,9vw,52px);line-height:1.05;text-shadow:0 2px 14px rgba(0,0,0,.55);overflow-wrap:anywhere}
 .cp-eslogan{margin:0;font-size:17px;max-width:30ch;text-shadow:0 1px 10px rgba(0,0,0,.6)}
 .cp-pill{display:inline-block;padding:6px 14px;border-radius:999px;background:rgba(0,0,0,.45);backdrop-filter:blur(6px);font-weight:800;font-size:13px;letter-spacing:.4px}
 .cp-cta{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:6px}
@@ -623,7 +623,7 @@ const CSS = `
 .cp-nav button.on{background:var(--marca);border-color:var(--marca);color:var(--sobre-marca)}
 .cp-cat{scroll-margin-top:68px;margin-top:34px;border-radius:20px;overflow:hidden;background:var(--sup);border:1px solid var(--linea)}
 .cp-cat-cab{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:16px 18px 14px;background:color-mix(in srgb,var(--marca) 16%,var(--sup));border-bottom:3px solid var(--marca)}
-.cp-cat-t{font-family:Georgia,'Times New Roman',serif;font-size:27px;line-height:1.1;margin:0;letter-spacing:.2px}
+.cp-cat-t{font-family:'Fraunces',Georgia,'Times New Roman',serif;font-size:27px;line-height:1.1;margin:0;letter-spacing:.2px}
 .cp-cat-n{font-size:13px;font-weight:700;color:var(--suave);white-space:nowrap}
 .cp-cat-lista{padding:0 18px}
 .cp-cat-lista .cp-plato:last-child{border-bottom:0}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Icono from './iconos'
 import { supabase } from './supabase'
 import Admin from './Admin'
 import Anclar from './Anclar'
@@ -202,7 +203,7 @@ export default function Superadmin() {
 
       {lista.length === 0 && (
         <div className="vacio">
-          <span className="vacio-icono">🏪</span>
+          <span className="vacio-icono"><Icono n="tienda" tam={34} ancho={1.5} /></span>
           <b>Todavía no hay restaurantes</b>
           <span>Crea el primero con el botón de abajo.</span>
         </div>
@@ -276,7 +277,7 @@ export default function Superadmin() {
                     setColoresDe(coloresDe === r.id ? null : r.id)
                   }}
                 >
-                  🎨 Colores
+                  <Icono n="paleta" tam={15} className="it" /> Colores
                 </button>
                 <button className={`btn ${r.activo ? 'btn-sec' : 'btn-principal'}`} style={s.accion} onClick={() => alternar(r)}>
                   {r.activo ? 'Desactivar' : 'Activar'}

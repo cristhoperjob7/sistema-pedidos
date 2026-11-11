@@ -190,7 +190,7 @@ export default function Menu({ restaurante }) {
 
       {cats.length === 0 && (
         <div className="vacio">
-          <span className="vacio-icono">📋</span>
+          <span className="vacio-icono"><Icono n="lista" tam={34} ancho={1.5} /></span>
           <b>Todavía no hay categorías</b>
           <span>Empieza por una, por ejemplo “Platos” o “Bebidas”.</span>
         </div>

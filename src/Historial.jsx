@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import Icono from './iconos'
 import { supabase } from './supabase'
 import { formatear } from './moneda'
 import { Cargando, Desplegable, Mensaje, Confirmar } from './ui'
@@ -86,7 +87,7 @@ export default function Historial({ restaurante }) {
         <h2 style={{ margin: 0 }}>Historial de ventas</h2>
         <span style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <button className="btn btn-chico btn-peligro-suave" disabled={!lista || lista.length === 0} onClick={() => { sentir('toque'); setLimpiar(true) }}>
-            🗑 Limpiar historial
+            <Icono n="basura" tam={15} className="it" /> Limpiar historial
           </button>
           <input className="campo-chico" type="date" value={dia} max={hoy} onChange={(e) => { setLista(null); setDia(e.target.value) }} aria-label="Filtrar por día" />
           {dia && (
@@ -109,7 +110,7 @@ export default function Historial({ restaurante }) {
       {!lista && !error && <Cargando filas={4} alto={64} />}
       {lista && lista.length === 0 && (
         <div className="vacio">
-          <span className="vacio-icono">🧾</span>
+          <span className="vacio-icono"><Icono n="recibo" tam={34} ancho={1.5} /></span>
           <b>No hay ventas para mostrar</b>
           <span>{dia ? 'Prueba con otro día.' : 'Cuando se cobre la primera cuenta aparecerá aquí.'}</span>
         </div>

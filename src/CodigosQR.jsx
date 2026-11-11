@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import Icono from './iconos'
 import QRCode from 'qrcode'
 import { supabase } from './supabase'
 import { Cargando, Confirmar, Interruptor, Mensaje, Segmento } from './ui'
@@ -236,12 +237,12 @@ ${hojas
         </Interruptor>
         {hayBloqueos && (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '10px 12px', borderRadius: 12, background: 'var(--durazno)', border: '1px solid var(--borde-aviso)', color: 'var(--aviso-tinta)' }}>
-            <span style={{ flex: 1, minWidth: 180 }}>🔒 Hay {nBloqueos} {nBloqueos === 1 ? 'código bloqueado' : 'códigos bloqueados'} por pedidos molestos.</span>
+            <span style={{ flex: 1, minWidth: 180 }}><Icono n="candado" tam={15} className="it" /> Hay {nBloqueos} {nBloqueos === 1 ? 'código bloqueado' : 'códigos bloqueados'} por pedidos molestos.</span>
             <button className="btn btn-chico btn-sec" onClick={() => desbloquear({ todo: true })}>Desbloquear todos</button>
           </div>
         )}
         <button className="btn btn-principal btn-chico" style={{ justifySelf: 'start' }} onClick={() => imprimir([...mesas.map((m) => m.id), 'llevar'])}>
-          🖨 Ver e imprimir todas
+          <Icono n="impresora" tam={15} className="it" /> Ver e imprimir todas
         </button>
       </div>
 
@@ -260,7 +261,7 @@ ${hojas
           />
         ))}
         <Tarjeta
-          titulo="🥡 Para llevar"
+          titulo={<><Icono n="bolsa" tam={16} className="it" /> Para llevar</>}
           sub="QR general del local"
           img={imgs.llevar}
           url={urlCarta(rest.slug, rest.qr_token_llevar)}
@@ -294,7 +295,7 @@ function Tarjeta({ titulo, sub, img, url, onImprimir, onRegenerar, bloqueoHasta,
       {sub ? <small className="suave">{sub}</small> : null}
       {bloqueoHasta && (
         <div style={{ display: 'grid', gap: 4, justifyItems: 'center' }}>
-          <small style={{ fontWeight: 800, color: 'var(--rosa-tinta)' }}>🔒 Pedidos pausados · {min} min</small>
+          <small style={{ fontWeight: 800, color: 'var(--rosa-tinta)' }}><Icono n="candado" tam={15} className="it" /> Pedidos pausados · {min} min</small>
           <button className="btn btn-chico btn-principal" onClick={onDesbloquear}>Desbloquear</button>
         </div>
       )}

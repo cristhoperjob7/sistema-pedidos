@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Icono from './iconos'
 import { supabase } from './supabase'
 import Anclar from './Anclar'
 import { Cargando, Desplegable, Mensaje } from './ui'
@@ -8,7 +9,7 @@ import { avisar, celebrar, sentir, sonar, vibrar } from './feedback'
 // reglas de seguridad); solo cambia el texto que ve la persona, para que sirva sin importar
 // el género de quien atiende el salón.
 const ROLES = { admin: 'Administrador', mesera: 'Salón', cocina: 'Cocina' }
-const ICONO_ROL = { admin: '🗝️', mesera: '🍽️', cocina: '🍳' }
+const ICONO_ROL = { admin: 'llave', mesera: 'cubiertos', cocina: 'gorro' }
 const FORM_INICIAL = { nombre: '', username: '', rol: 'mesera', pin: '' }
 
 async function llamar(body) {
@@ -152,7 +153,7 @@ export default function Personal({ restaurante, scrollAlAbrir = false }) {
 
       {lista.length === 0 && (
         <div className="vacio">
-          <span className="vacio-icono">👋</span>
+          <span className="vacio-icono"><Icono n="personas" tam={34} ancho={1.5} /></span>
           <b>Todavía no hay personal</b>
           <span>Agrega a quienes atienden el salón y la cocina.</span>
         </div>
@@ -163,7 +164,7 @@ export default function Personal({ restaurante, scrollAlAbrir = false }) {
         return (
           <div key={m.id} className="entra" style={{ ...s.fila, opacity: m.activo ? 1 : 0.55 }}>
             <span style={s.avatar} aria-hidden="true">
-              {ICONO_ROL[m.rol] ?? '🙂'}
+              <Icono n={ICONO_ROL[m.rol] ?? 'usuario'} tam={20} />
             </span>
             <div style={{ flex: '1 1 140px', minWidth: 0 }}>
               <b>{m.nombre}</b> {soyYo && <small style={s.tu}>tú</small>}

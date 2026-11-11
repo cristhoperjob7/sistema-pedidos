@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Icono from './iconos'
 import { sentir } from './feedback'
 
 // Campo de texto que se edita en el lugar y se guarda al salir de él (o con Enter).
@@ -42,7 +43,7 @@ export default function Campo({ valor, onGuardar, style, className = 'campo', fi
       />
       {estado?.tipo === 'guardado' && (
         <span key={estado.n} className="campo-check" aria-hidden="true">
-          ✓
+          <Icono n="check" tam={15} className="it" />
         </span>
       )}
     </span>

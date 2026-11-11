@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import Icono from './iconos'
 import { supabase } from './supabase'
 import { formatear } from './moneda'
 import { Cargando, Mensaje, NumeroAnimado } from './ui'
@@ -44,10 +45,10 @@ const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Vier
 // Para separar "lo más vendido" según el Tipo de cada categoría (se edita en el Menú).
 // Así un restaurante de helados ve "Postres más vendidos" y no "Platos más vendidos".
 const TIPOS_INFO = {
-  plato: { icono: '🍽️', titulo: 'Platos más vendidos' },
-  postre: { icono: '🍰', titulo: 'Postres más vendidos' },
-  bebida: { icono: '🥤', titulo: 'Bebidas más vendidas' },
-  otro: { icono: '📦', titulo: 'Otros más vendidos' },
+  plato: { icono: 'cubiertos', titulo: 'Platos más vendidos' },
+  postre: { icono: 'postre', titulo: 'Postres más vendidos' },
+  bebida: { icono: 'bebida', titulo: 'Bebidas más vendidas' },
+  otro: { icono: 'paquete', titulo: 'Otros más vendidos' },
 }
 const ORDEN_TIPOS = ['plato', 'postre', 'bebida', 'otro']
 
@@ -186,7 +187,7 @@ export default function ReporteMensual({ restaurante }) {
 
       {r && r.cuentas === 0 && (
         <div className="vacio aparece">
-          <span className="vacio-icono">📅</span>
+          <span className="vacio-icono"><Icono n="calendario" tam={34} ancho={1.5} /></span>
           <b>Este mes todavía no hay ventas cerradas</b>
           <span>Cuando se cobren cuentas, aquí verás cómo va el mes.</span>
         </div>
@@ -220,14 +221,14 @@ export default function ReporteMensual({ restaurante }) {
           <div style={s.grilla}>
             {r.mejorDia && (
               <div className="entra" style={{ ...s.tarjeta, animationDelay: '80ms' }}>
-                <small style={s.suave}>🏆 Tu mejor día</small>
+                <small style={s.suave}><Icono n="trofeo" tam={15} className="it" /> Tu mejor día</small>
                 <b style={{ fontSize: 18 }}>{nombreDia(r.mejorDia.dia)}</b>
                 <span>Vendiste {formatear(r.mejorDia.total, restaurante)}</span>
               </div>
             )}
             {r.mejorSemana && (
               <div className="entra" style={{ ...s.tarjeta, animationDelay: '140ms' }}>
-                <small style={s.suave}>📅 Tu mejor día de la semana</small>
+                <small style={s.suave}><Icono n="calendario" tam={15} className="it" /> Tu mejor día de la semana</small>
                 <b style={{ fontSize: 18 }}>{r.mejorSemana.nombre}</b>
                 <span>En promedio vendes {formatear(r.mejorSemana.promedio, restaurante)}</span>
                 <small style={s.suave}>Te puede servir para reforzar el personal ese día</small>
@@ -244,7 +245,7 @@ export default function ReporteMensual({ restaurante }) {
                 return (
                   <div key={tipo} className="entra" style={{ ...s.tarjeta, animationDelay: `${200 + i * 60}ms` }}>
                     <small style={s.suave}>
-                      {info.icono} {info.titulo}
+                      <Icono n={info.icono} tam={16} className="it" /> {info.titulo}
                     </small>
                     {lista.map(([nombre, cantidad], i) => (
                       <span key={nombre}>

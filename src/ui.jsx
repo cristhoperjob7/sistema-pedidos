@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import Icono from './iconos'
 import { createPortal } from 'react-dom'
 import { escucharAvisos, movimientoReducido, sentir } from './feedback'
 
@@ -58,7 +59,7 @@ export function Mensaje({ tipo = 'ok', children }) {
   if (!children) return null
   return (
     <p key={String(children)} className={`msj msj-${tipo}`} role={tipo === 'error' ? 'alert' : 'status'}>
-      <span aria-hidden="true">{tipo === 'error' ? '⚠️' : '✓'}</span>
+      <span aria-hidden="true">{tipo === 'error' ? <><Icono n="alerta" tam={15} className="it" /></> : <><Icono n="check" tam={15} className="it" /></>}</span>
       <span>{children}</span>
     </p>
   )
@@ -66,7 +67,7 @@ export function Mensaje({ tipo = 'ok', children }) {
 
 // ---------------------------------------------------------------------------------------------
 // Avisos flotantes: píldoras que bajan desde arriba y se van solas. Se monta una vez en App.
-const ICONOS = { ok: '✓', error: '⚠️', info: '•', cocina: '🍳', cobro: '💸', borrar: '🗑️', agotado: '🚫', listo: '🔔' }
+const ICONOS = { ok: 'check', error: 'alerta', info: 'circulo', cocina: 'gorro', cobro: 'dinero', borrar: 'basura', agotado: 'prohibido', listo: 'timbre' }
 
 export function Avisos() {
   const [lista, setLista] = useState([])
@@ -96,7 +97,7 @@ export function Avisos() {
           onClick={() => cerrar(a.id)}
         >
           <span className="aviso-icono" aria-hidden="true">
-            {ICONOS[a.tipo] ?? '✓'}
+            {ICONOS[a.tipo] ?? <><Icono n="check" tam={15} className="it" /></>}
           </span>
           {a.texto}
         </button>

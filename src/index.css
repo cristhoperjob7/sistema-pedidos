@@ -1,5 +1,5 @@
 /* Letra redondeada y amable (si no carga, se usa la del sistema). */
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap');
 
 *,
 *::before,
@@ -82,9 +82,11 @@ body {
   min-height: 100vh;
   min-height: 100dvh;
   color: var(--tinta);
-  font-family: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   font-size: 16px;
   line-height: 1.45;
+  letter-spacing: -0.005em;
+  font-feature-settings: 'cv11', 'ss01';
   -webkit-font-smoothing: antialiased;
   background:
     radial-gradient(900px 520px at 100% -10%, color-mix(in srgb, var(--marca) 16%, transparent) 0%, transparent 60%),
@@ -863,7 +865,21 @@ button:disabled {
   border-radius: var(--radio);
   background: color-mix(in srgb, var(--sup) 60%, transparent);
 }
+.it {
+  display: inline-block;
+  vertical-align: -0.2em;
+  margin-right: 0.4em;
+}
+.it:last-child {
+  margin-right: 0;
+}
+/* Números con ancho fijo: precios y totales se alinean en columna */
+b, strong, td, .tabular, [class*='precio'], [class*='total'] {
+  font-variant-numeric: tabular-nums;
+}
 .vacio-icono {
+  color: var(--suave);
+  display: inline-flex;
   font-size: 34px;
   animation: flota 3s ease-in-out infinite;
 }
