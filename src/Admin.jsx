@@ -9,6 +9,7 @@ import Caja from './Caja'
 import CodigosQR from './CodigosQR'
 import AvisosQR from './AvisosQR'
 import Historial from './Historial'
+import Inicio from './Inicio'
 import ReporteMensual from './ReporteMensual'
 import Anclar from './Anclar'
 import Icono from './iconos'
@@ -17,11 +18,13 @@ import { sentir } from './feedback'
 import './panel.css'
 
 const ANGOSTO = { maxWidth: 860, margin: '0 auto', width: '100%' }
+const ANCHO = { maxWidth: 1080, margin: '0 auto', width: '100%' }
 
 // Secciones del menú lateral. "Operación" y "Análisis" solo existen cuando el administrador
 // también atiende el local (el superadmin que entra a un restaurante solo ve "Negocio").
 function secciones(conPedidos) {
   return [
+    { titulo: 'General', items: [['inicio', 'Inicio', 'inicio']] },
     conPedidos && {
       titulo: 'Operación',
       items: [
@@ -60,7 +63,7 @@ function abrirEstadisticas() {
 // Panel de administración de un restaurante. Lo usan su administrador y el superadmin.
 // conPedidos: el administrador del restaurante también puede tomar pedidos (el superadmin no).
 export default function Admin({ restaurante, scrollAlAbrir = false, conPedidos = false }) {
-  const [tab, setTab] = useState(conPedidos ? 'pedidos' : 'menu')
+  const [tab, setTab] = useState('inicio')
   const [abierto, setAbierto] = useState(false) // cajón del celular
   const grupos = secciones(conPedidos)
   const nombreActivo = grupos.flatMap((g) => g.items).find(([id]) => id === tab)?.[1]
@@ -136,7 +139,8 @@ export default function Admin({ restaurante, scrollAlAbrir = false, conPedidos =
             </div>
           )}
           {!['pedidos', 'cocina'].includes(tab) && (
-            <div key={tab} className="aparece" style={ANGOSTO}>
+            <div key={tab} className="aparece" style={tab === 'inicio' ? ANCHO : ANGOSTO}>
+              {tab === 'inicio' && <Inicio restaurante={restaurante} conPedidos={conPedidos} ir={elegir} />}
               {tab === 'historial' && conPedidos && <Historial restaurante={restaurante} />}
               {tab === 'caja' && <Caja restaurante={restaurante} />}
               {tab === 'reporte' && conPedidos && <Reporte restaurante={restaurante} />}

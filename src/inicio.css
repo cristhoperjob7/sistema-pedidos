@@ -1,0 +1,437 @@
+/* ===== Inicio del administrador ===== */
+.ini {
+  display: grid;
+  gap: 16px;
+}
+.ini-cab {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ini-fecha {
+  display: block;
+}
+.ini-fecha::first-letter {
+  text-transform: uppercase;
+}
+.ini-nombre {
+  color: var(--suave);
+  font-weight: 700;
+}
+.ini-sub {
+  margin: 4px 0 10px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--suave);
+}
+
+/* --- Tarjetas con cifras --- */
+.ini-kpis {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 900px) {
+  .ini-kpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.ini-kpi {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  padding: 16px;
+  border-radius: 18px;
+  background: var(--sup);
+  border: 1px solid var(--linea);
+  box-shadow: var(--sombra);
+}
+.ini-kpi-grande {
+  grid-column: 1 / -1;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--marca) 20%, var(--sup)), var(--sup) 70%);
+  border-color: color-mix(in srgb, var(--marca) 35%, var(--linea));
+}
+@media (min-width: 900px) {
+  .ini-kpi-grande {
+    grid-column: span 2;
+    grid-row: span 2;
+    align-content: center;
+  }
+}
+.ini-num {
+  font-size: clamp(26px, 4.4vw, 34px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.ini-kpi-grande .ini-num {
+  font-size: clamp(32px, 6vw, 44px);
+}
+.ini-cambios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 2px;
+}
+.ini-cambio {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 800;
+  color: var(--suave);
+}
+.ini-cambio.sube {
+  color: var(--menta-tinta);
+}
+.ini-cambio.baja {
+  color: var(--rosa-tinta);
+}
+.ini-barrita {
+  height: 6px;
+  border-radius: 99px;
+  background: var(--lavanda);
+  overflow: hidden;
+  margin-top: 4px;
+}
+.ini-barrita span {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--marca);
+  transition: width 600ms var(--ease);
+}
+
+/* --- Tarjetas de contenido --- */
+.ini-dos {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 900px) {
+  .ini-dos {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+}
+.ini-tarjeta {
+  padding: 16px;
+  border-radius: 18px;
+  background: var(--sup);
+  border: 1px solid var(--linea);
+  box-shadow: var(--sombra);
+  min-width: 0;
+}
+.ini-tarjeta h3 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+.ini-vacio {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 22px 8px;
+  text-align: center;
+  color: var(--suave);
+}
+
+/* --- Gráfico de ventas por hora --- */
+.ini-graf {
+  position: relative;
+}
+.ini-tip {
+  position: absolute;
+  top: -6px;
+  right: 0;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: var(--lavanda);
+  border: 1px solid var(--linea);
+  font-size: 13px;
+  z-index: 2;
+}
+.ini-barras {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  height: 190px;
+  padding-top: 24px;
+  border-bottom: 1px solid var(--linea);
+}
+.ini-barra {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  cursor: pointer;
+}
+.ini-barra-col {
+  display: block;
+  width: min(34px, 100%);
+  border-radius: 4px 4px 0 0;
+  background: color-mix(in srgb, var(--marca) 45%, var(--sup));
+  transition: height 600ms var(--ease), background 160ms;
+}
+.ini-barra.ahora .ini-barra-col,
+.ini-barra:hover .ini-barra-col,
+.ini-barra.activa .ini-barra-col {
+  background: var(--marca);
+}
+.ini-barra:focus-visible {
+  outline: 2px solid var(--marca);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.ini-barra-val {
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  color: var(--tinta);
+  font-variant-numeric: tabular-nums;
+}
+.ini-eje {
+  display: flex;
+  gap: 6px;
+  padding-top: 6px;
+  font-size: 12px;
+  color: var(--suave);
+  font-variant-numeric: tabular-nums;
+}
+.ini-eje span {
+  flex: 1 1 0;
+  text-align: center;
+  min-width: 0;
+}
+.ini-tabla {
+  margin-top: 10px;
+  font-size: 14px;
+}
+.ini-tabla summary {
+  cursor: pointer;
+  color: var(--suave);
+  font-weight: 700;
+}
+.ini-tabla table {
+  width: 100%;
+  margin-top: 6px;
+  border-collapse: collapse;
+}
+.ini-tabla td {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--linea);
+}
+
+/* --- Lo más vendido --- */
+.ini-top,
+.ini-pagos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.ini-top li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  align-items: center;
+}
+.ini-pos {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: var(--lavanda);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--suave);
+}
+.ini-top-nombre {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+.ini-top-barra,
+.ini-pago-barra {
+  grid-column: 2 / -1;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--lavanda);
+  overflow: hidden;
+}
+.ini-top-barra span,
+.ini-pago-barra span {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--marca);
+  transition: width 600ms var(--ease);
+}
+.ini-pagos li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 2px 10px;
+  align-items: baseline;
+}
+.ini-pagos li > span:first-child {
+  font-weight: 700;
+}
+.ini-pago-barra {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+/* --- Accesos rápidos --- */
+.ini-acc {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.ini-acceso {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--sup);
+  border: 1px solid var(--linea);
+  color: var(--tinta);
+  font-weight: 800;
+  font-size: 15px;
+  text-align: left;
+}
+.ini-acceso svg {
+  color: var(--marca);
+}
+@media (hover: hover) {
+  .ini-acceso:hover {
+    border-color: var(--marca);
+    background: color-mix(in srgb, var(--marca) 8%, var(--sup));
+  }
+}
+
+/* ===== Asistente de configuración ===== */
+.asist {
+  padding: 16px;
+  border-radius: 20px;
+  background: var(--sup);
+  border: 1px solid color-mix(in srgb, var(--marca) 35%, var(--linea));
+  box-shadow: var(--sombra);
+}
+.asist-cab {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.asist-tit {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.asist-tit h3 {
+  margin: 0 0 2px;
+  font-size: 17px;
+}
+.asist-anillo {
+  --pct: 0%;
+  position: relative;
+  flex: none;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(var(--marca) var(--pct), var(--lavanda) 0);
+}
+.asist-anillo::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: var(--sup);
+}
+.asist-anillo b {
+  position: relative;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.asist-lista {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.asist-paso {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 14px;
+  flex-wrap: wrap;
+}
+.asist-paso.actual {
+  background: color-mix(in srgb, var(--marca) 10%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--marca) 35%, transparent);
+}
+.asist-marca {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--lavanda);
+  color: var(--suave);
+}
+.asist-paso.actual .asist-marca {
+  background: var(--marca);
+  color: var(--sobre-marca);
+}
+.asist-paso.listo .asist-marca {
+  background: var(--menta);
+  color: var(--menta-tinta);
+}
+.asist-texto {
+  flex: 1 1 220px;
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+.asist-paso.listo .asist-texto b {
+  color: var(--suave);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--suave) 50%, transparent);
+}
+.asist-acc {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.asist-mini {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px dashed color-mix(in srgb, var(--marca) 50%, var(--linea));
+  background: transparent;
+  color: var(--tinta);
+  font-weight: 700;
+}
+.asist-mini svg:last-child {
+  margin-left: auto;
+}

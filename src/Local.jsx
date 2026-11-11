@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import Icono from './iconos'
 import { supabase } from './supabase'
 import Campo from './Campo'
-import { Cargando, Desplegable, Interruptor, Mensaje, Confirmar } from './ui'
+import { Cargando, Desplegable, Interruptor, Mensaje, Confirmar, Vacio } from './ui'
 import { avisar, sentir, sonar, vibrar } from './feedback'
 
 // Mesas, métodos de pago y ajustes de cocina de un restaurante.
@@ -147,11 +147,7 @@ export default function Local({ restaurante }) {
           </small>
         </div>
         {mesas.length === 0 && (
-          <div className="vacio">
-            <span className="vacio-icono"><Icono n="silla" tam={34} ancho={1.5} /></span>
-            <b>No hay mesas</b>
-            <span>Agrega la primera con el botón de abajo.</span>
-          </div>
+          <Vacio icono="silla" titulo="No hay mesas" texto={<>Agrega la primera con el botón de abajo.</>} accion={{ texto: 'Agregar una mesa', foco: '[placeholder="Nombre (opcional)"]' }} />
         )}
         {mesas.map((m) => (
           <div key={m.id} className="entra" style={{ ...s.fila, opacity: m.activo ? 1 : 0.55 }}>

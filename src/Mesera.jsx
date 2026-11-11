@@ -18,6 +18,19 @@ const etiquetaPedido = (p, mesas) =>
 // "Mesa" ficticia para armar un pedido para llevar con la misma pantalla de las mesas.
 const MESA_LLEVAR = { id: null, numero: null, nombre: null, llevar: true }
 
+// ¿La pantalla es lo bastante ancha (tablet horizontal o computador) para mostrar mesas y cuenta lado a lado?
+function useAnchoGrande(minimo) {
+  const consulta = `(min-width: ${minimo}px)`
+  const [ancho, setAncho] = useState(() => typeof window !== 'undefined' && window.matchMedia(consulta).matches)
+  useEffect(() => {
+    const m = window.matchMedia(consulta)
+    const alCambiar = () => setAncho(m.matches)
+    m.addEventListener('change', alCambiar)
+    return () => m.removeEventListener('change', alCambiar)
+  }, [])
+  return ancho
+}
+
 // Pantallas del salón: mapa de mesas, pedidos para llevar, toma de pedido y cobro.
 // rol: 'admin' o 'mesera'. Solo cambia lo que se muestra; la base de datos hace cumplir los permisos.
 export default function Mesera({ restaurante, rol = 'mesera' }) {
@@ -26,6 +39,8 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
   const [juntando, setJuntando] = useState(false) // ventana para juntar mesas (antes de pedir)
   const [vista, setVista] = useState({ nombre: 'mesas' }) // { nombre: 'mesas' | 'mesa' | 'llevar' | 'cobrar', mesaId, llevarId, atras }
   const temporizador = useRef(null)
+  // El administrador tiene además el menú lateral, por eso necesita más ancho para el modo de dos paneles.
+  const ancho = useAnchoGrande(rol === 'admin' ? 1440 : 1100)
   const listosVistos = useRef(null) // pedidos listos ya conocidos; null en la primera carga para no avisar de golpe
 
   const cargar = useCallback(async () => {
@@ -186,8 +201,9 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
       : undefined
   const items = pedido ? itemsPorPedido.get(pedido.id) ?? [] : []
 
+  let detalle = null
   if ((vista.nombre === 'mesa' || vista.nombre === 'llevar') && mesa) {
-    return (
+    detalle = (
       <Mesa
         key={mesa.id ?? 'llevar'}
         restaurante={restaurante}
@@ -217,7 +233,7 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
   }
 
   if (vista.nombre === 'cobrar' && mesa) {
-    return (
+    detalle = (
       <Cobrar
         restaurante={restaurante}
         datos={datos}
@@ -236,13 +252,16 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
     )
   }
 
+  // En pantalla chica el detalle ocupa todo; en pantalla ancha va a la derecha de la lista de mesas.
+  if (detalle && !ancho) return detalle
+
   const llevarAbiertos = datos.pedidos.filter(esLlevar).sort((x, y) => x.llevar_numero - y.llevar_numero)
   const mesasVisibles = datos.mesas.filter((m) => !m.unida_a)
   const ocupadas = mesasVisibles.filter((m) => pedidoPorMesa.has(m.id) || miembrosDe.has(m.id)).length
   const libresN = mesasVisibles.length - ocupadas
 
-  return (
-    <div className={vista.atras ? 'entra-izquierda' : 'aparece'}>
+  const panelMesas = (
+    <div className={ancho ? 'aparece' : vista.atras ? 'entra-izquierda' : 'aparece'}>
       <div style={s.cabeceraMesas}>
         <h2 style={{ margin: 0 }}>Mesas</h2>
         {datos.mesas.length > 0 && (
@@ -315,7 +334,7 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
               return (
                 <div
                   key={p.id}
-                  className={`entra${lista ? ' mesa-lista' : ''}`}
+                  className={`entra${lista ? ' mesa-lista' : ''}${ancho && mesa && mesa.id === m.id ? ' mesa-sel' : ''}`}
                   style={{ ...s.mesa, ...(lista ? s.mesaLista : s.mesaOcupada), animationDelay: `${Math.min(i, 12) * 30}ms` }}
                 >
                   <button
@@ -442,6 +461,24 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
             </div>
           )
         })}
+      </div>
+    </div>
+  )
+
+  if (!ancho) return panelMesas
+  return (
+    <div className="salon-dividido">
+      <div className="salon-lista">{panelMesas}</div>
+      <div className="salon-detalle">
+        {detalle ?? (
+          <div className="vacio salon-vacio">
+            <span className="vacio-icono">
+              <Icono n="silla" tam={34} ancho={1.5} />
+            </span>
+            <b>Elige una mesa</b>
+            <span>Toca una mesa de la izquierda para ver su cuenta y tomar el pedido.</span>
+          </div>
+        )}
       </div>
     </div>
   )

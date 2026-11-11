@@ -52,6 +52,23 @@ export function Desplegable({ abierto, children, className = '', style }) {
 
 // ---------------------------------------------------------------------------------------------
 // Mensaje en línea (éxito o error). Entra suave; los errores además "tiemblan" un poco.
+// Convierte los textos técnicos que devuelve la red o la base de datos en frases que una persona entiende.
+// Si no reconoce el error, lo deja tal cual (los que escribimos nosotros ya vienen en español).
+export function amigable(texto) {
+  if (typeof texto !== 'string') return texto
+  const t = texto.toLowerCase()
+  if (/failed to fetch|networkerror|load failed|network request failed/.test(t))
+    return 'No hay conexión con el servidor. Revisa tu internet e inténtalo de nuevo.'
+  if (/jwt expired|invalid jwt|refresh token|not authenticated|auth session missing/.test(t))
+    return 'Tu sesión venció. Vuelve a iniciar sesión para continuar.'
+  if (/row-level security|permission denied|not authorized|insufficient_privilege/.test(t))
+    return 'No tienes permiso para hacer eso con esta cuenta.'
+  if (/duplicate key|already exists|unique constraint/.test(t)) return 'Eso ya existe. Prueba con otro nombre o número.'
+  if (/timeout|timed out|statement timeout/.test(t)) return 'El servidor tardó demasiado en responder. Inténtalo otra vez.'
+  if (/violates foreign key/.test(t)) return 'No se puede hacer porque otra parte del sistema todavía usa este dato.'
+  return texto
+}
+
 export function Mensaje({ tipo = 'ok', children }) {
   useEffect(() => {
     if (children && tipo === 'error') sentir('error')
@@ -60,7 +77,7 @@ export function Mensaje({ tipo = 'ok', children }) {
   return (
     <p key={String(children)} className={`msj msj-${tipo}`} role={tipo === 'error' ? 'alert' : 'status'}>
       <span aria-hidden="true">{tipo === 'error' ? <><Icono n="alerta" tam={15} className="it" /></> : <><Icono n="check" tam={15} className="it" /></>}</span>
-      <span>{children}</span>
+      <span>{tipo === 'error' ? amigable(children) : children}</span>
     </p>
   )
 }
@@ -255,5 +272,66 @@ export function Confirmar({
       </div>
     </div>,
     document.body
+  )
+}
+
+// ---------------------------------------------------------------------------------------------
+// Pantalla vacía con ánimo: ícono, qué pasa y, si se puede, un botón que lleva al campo para empezar.
+// accion = { texto, foco } donde `foco` es un selector CSS del campo que hay que enfocar (ej. '[placeholder^="Nombre"]').
+export function Vacio({ icono = 'lista', titulo, texto, accion }) {
+  function ir() {
+    sentir('toque')
+    const el = accion?.foco ? document.querySelector(accion.foco) : null
+    if (!el) return accion?.onClick?.()
+    el.scrollIntoView({ behavior: movimientoReducido() ? 'auto' : 'smooth', block: 'center' })
+    setTimeout(() => el.focus({ preventScroll: true }), 350)
+  }
+  return (
+    <div className="vacio">
+      <span className="vacio-icono">
+        <Icono n={icono} tam={34} ancho={1.5} />
+      </span>
+      <b>{titulo}</b>
+      {texto && <span>{texto}</span>}
+      {accion && (
+        <button className="btn btn-chico btn-morado" onClick={ir}>
+          {accion.texto}
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------------------------
+// Franja que avisa cuando se cae el internet y se retira sola al volver. Se monta una vez en App.
+export function BannerConexion() {
+  const [enLinea, setEnLinea] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine))
+  const [volvio, setVolvio] = useState(false)
+  useEffect(() => {
+    let t
+    const cae = () => {
+      setEnLinea(false)
+      setVolvio(false)
+    }
+    const vuelve = () => {
+      setEnLinea(true)
+      setVolvio(true)
+      clearTimeout(t)
+      t = setTimeout(() => setVolvio(false), 2500)
+    }
+    window.addEventListener('offline', cae)
+    window.addEventListener('online', vuelve)
+    return () => {
+      window.removeEventListener('offline', cae)
+      window.removeEventListener('online', vuelve)
+      clearTimeout(t)
+    }
+  }, [])
+  if (enLinea && !volvio) return null
+  return (
+    <div className={`banner-red ${enLinea ? 'ok' : 'sin'}`} role="status" aria-live="polite">
+      <Icono n={enLinea ? 'check' : 'alerta'} tam={15} className="it" />
+      {enLinea ? 'Conexión recuperada' : 'Sin conexión. Reintentando… los cambios no se guardarán hasta que vuelva.'}
+    </div>
   )
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import Icono from './iconos'
 import { supabase } from './supabase'
 import Anclar from './Anclar'
-import { Cargando, Desplegable, Mensaje } from './ui'
+import { Cargando, Desplegable, Mensaje, Vacio } from './ui'
 import { avisar, celebrar, sentir, sonar, vibrar } from './feedback'
 
 // La clave interna sigue siendo "mesera" (así está guardado en la base de datos y en las
@@ -152,11 +152,7 @@ export default function Personal({ restaurante, scrollAlAbrir = false }) {
       <Mensaje tipo="ok">{aviso}</Mensaje>
 
       {lista.length === 0 && (
-        <div className="vacio">
-          <span className="vacio-icono"><Icono n="personas" tam={34} ancho={1.5} /></span>
-          <b>Todavía no hay personal</b>
-          <span>Agrega a quienes atienden el salón y la cocina.</span>
-        </div>
+        <Vacio icono="personas" titulo="Todavía no hay personal" texto={<>Agrega a quienes atienden el salón y la cocina.</>} accion={{ texto: 'Agregar a la primera persona', foco: '[placeholder^="Nombre (ej: Rosa"]' }} />
       )}
       {lista.map((m) => {
         const bloqueado = m.bloqueado_hasta && new Date(m.bloqueado_hasta) > new Date()

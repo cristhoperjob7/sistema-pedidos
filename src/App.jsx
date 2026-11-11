@@ -13,7 +13,7 @@ import CartaPublica, { rutaCarta } from './CartaPublica'
 import Cocina from './Cocina'
 import Estadisticas from './Estadisticas'
 import Login, { NuevaClave, MARCA } from './Login'
-import { Avisos, Cargando } from './ui'
+import { Avisos, Cargando, BannerConexion } from './ui'
 import { sentir } from './feedback'
 
 // Lee lo que Supabase deja en la dirección al volver del correo de recuperación.
@@ -84,6 +84,7 @@ function AppPersonal() {
     <div className="app">
       {contenido}
       <Avisos />
+      <BannerConexion />
     </div>
   )
 }
@@ -257,7 +258,7 @@ const estilos = {
     borderBottom: '1px solid var(--linea)',
   },
   headerInterior: {
-    maxWidth: 1100,
+    maxWidth: 1360,
     margin: '0 auto',
     padding: '10px 16px',
     display: 'flex',
@@ -292,5 +293,5 @@ const estilos = {
     textOverflow: 'ellipsis',
   },
   salir: { background: 'var(--lavanda)', color: 'var(--tinta)', border: '1px solid var(--linea)', flex: 'none' },
-  main: { maxWidth: 1100, margin: '0 auto', padding: '16px 16px 32px' },
+  main: { maxWidth: 1360, margin: '0 auto', padding: '16px 16px 32px' },
 }

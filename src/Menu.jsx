@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import { formatear, leerPrecio, soloPrecio } from './moneda'
 import Icono from './iconos'
-import { Cargando, Desplegable, Interruptor, Mensaje, Confirmar } from './ui'
+import { Cargando, Desplegable, Interruptor, Mensaje, Confirmar, Vacio } from './ui'
 import { avisar, sentir, sonar, vibrar } from './feedback'
 import { ordenarNombre } from './orden'
 
@@ -189,11 +189,7 @@ export default function Menu({ restaurante }) {
       <Mensaje tipo="error">{error}</Mensaje>
 
       {cats.length === 0 && (
-        <div className="vacio">
-          <span className="vacio-icono"><Icono n="lista" tam={34} ancho={1.5} /></span>
-          <b>Todavía no hay categorías</b>
-          <span>Empieza por una, por ejemplo “Platos” o “Bebidas”.</span>
-        </div>
+        <Vacio icono="lista" titulo="Todavía no hay categorías" texto={<>Empieza por una, por ejemplo “Platos” o “Bebidas”.</>} accion={{ texto: 'Crear la primera categoría', foco: '[placeholder^="Nombre (ej: Entradas"]' }} />
       )}
 
       {cats.map((c, ci) => {
