@@ -430,22 +430,22 @@ export default function CartaPublica({ slug, token }) {
                       {p.destacado && !p.agotado ? <span className="cp-star"><Icono n="estrella" tam={15} className="it" /> Destacado</span> : null}
                       <h4>{p.nombre}</h4>
                       {p.descripcion ? <p>{p.descripcion}</p> : null}
-                      <div className="cp-plato-pie">
+                    </div>
+                    {fotoOk(p.foto) && <img className="cp-foto" src={p.foto} alt={p.nombre} loading="lazy" decoding="async" />}
+                    <div className="cp-plato-pie">
                         <b>{p.agotado ? 'Agotado por hoy' : $(p.precio)}</b>
                         {puedePedir && !p.agotado && (
                           n === 0 ? (
                             <button className="cp-add" onClick={() => cambiar(p.id, 1)} aria-label={`Agregar ${p.nombre}`}>Agregar</button>
                           ) : (
                             <div className="cp-paso">
-                              <button onClick={() => cambiar(p.id, -1)} aria-label={`Quitar uno de ${p.nombre}`}>−</button>
+                              <button onClick={() => cambiar(p.id, -1)} aria-label={`Quitar uno de ${p.nombre}`}><Icono n="menos" tam={18} ancho={2.4} /></button>
                               <b>{n}</b>
-                              <button onClick={() => cambiar(p.id, 1)} aria-label={`Agregar otro ${p.nombre}`}>+</button>
+                              <button onClick={() => cambiar(p.id, 1)} aria-label={`Agregar otro ${p.nombre}`}><Icono n="mas" tam={18} ancho={2.4} /></button>
                             </div>
                           )
                         )}
                       </div>
-                    </div>
-                    {fotoOk(p.foto) && <img className="cp-foto" src={p.foto} alt={p.nombre} loading="lazy" decoding="async" />}
                   </article>
                 )
               })}
@@ -616,7 +616,7 @@ const CSS = `
 .cp-novedad div{padding:14px 16px}
 .cp-novedad h3{margin:0 0 4px;font-size:18px}
 .cp-novedad p{margin:0;color:var(--suave);line-height:1.45;white-space:pre-line}
-.cp-nav{position:sticky;top:0;z-index:20;box-shadow:0 6px 14px -12px rgba(0,0,0,.6);background:color-mix(in srgb,var(--fondo) 92%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--linea);margin:6px 0 4px}
+.cp-nav{position:sticky;top:0;padding-top:env(safe-area-inset-top,0px);z-index:20;box-shadow:0 6px 14px -12px rgba(0,0,0,.6);background:color-mix(in srgb,var(--fondo) 92%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--linea);margin:6px 0 4px}
 .cp-nav-in{display:flex;gap:8px;overflow-x:auto;padding-top:10px;padding-bottom:10px;scrollbar-width:none}
 .cp-nav-in::-webkit-scrollbar{display:none}
 .cp-nav button{all:unset;cursor:pointer;white-space:nowrap;padding:8px 16px;border-radius:999px;border:1px solid var(--linea);background:var(--sup);font-weight:700;font-size:14px}
@@ -627,19 +627,22 @@ const CSS = `
 .cp-cat-n{font-size:13px;font-weight:700;color:var(--suave);white-space:nowrap}
 .cp-cat-lista{padding:0 18px}
 .cp-cat-lista .cp-plato:last-child{border-bottom:0}
-.cp-plato{display:flex;gap:14px;justify-content:space-between;align-items:stretch;padding:16px 0;border-bottom:1px solid var(--linea)}
+.cp-plato{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:14px;row-gap:12px;align-items:start;padding:18px 0;border-bottom:1px solid var(--linea)}
+.cp-plato:last-child{border-bottom:0}
 .cp-plato.agotado{opacity:.55}
-.cp-plato-txt{min-width:0;flex:1;display:flex;flex-direction:column;gap:4px}
+.cp-plato-txt{min-width:0;display:flex;flex-direction:column;gap:4px;grid-column:1}
+.cp-plato>.cp-foto{grid-column:2;grid-row:1}
 .cp-plato h4{margin:0;font-size:17px;line-height:1.25;overflow-wrap:anywhere}
 .cp-plato p{margin:0;color:var(--suave);font-size:14px;line-height:1.4}
 .cp-star{align-self:flex-start;font-size:11px;font-weight:800;letter-spacing:.3px;padding:2px 9px;border-radius:999px;background:var(--durazno);color:var(--aviso-tinta)}
-.cp-plato-pie{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:auto;padding-top:6px}
-.cp-plato-pie>b{font-size:16px;white-space:nowrap}
-.cp-foto{width:104px;height:104px;object-fit:cover;border-radius:14px;flex:none;align-self:flex-start}
-.cp-add{all:unset;cursor:pointer;padding:8px 16px;border-radius:999px;background:var(--marca);color:var(--sobre-marca);font-weight:800;font-size:14px}
-.cp-paso{display:flex;align-items:center;gap:8px}
-.cp-paso button{all:unset;cursor:pointer;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--sup);border:1px solid var(--linea);font-size:20px;line-height:1}
-.cp-paso b{min-width:20px;text-align:center}
+.cp-plato-pie{grid-column:1/-1;grid-row:2;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:40px}
+.cp-plato-pie>b{font-size:17px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cp-foto{width:96px;height:96px;object-fit:cover;border-radius:14px;flex:none;align-self:flex-start}
+.cp-add{all:unset;cursor:pointer;padding:10px 22px;border-radius:999px;background:var(--marca);color:var(--sobre-marca);font-weight:800;font-size:14px}
+.cp-paso{display:inline-flex;align-items:center;gap:2px;padding:3px;border-radius:999px;background:var(--sup);border:1px solid var(--linea)}
+.cp-paso button{all:unset;cursor:pointer;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:color-mix(in srgb,var(--marca) 16%,transparent);color:var(--tinta)}
+.cp-paso button:active{transform:scale(.92)}
+.cp-paso b{min-width:30px;text-align:center;font-size:16px}
 .cp-sobre{display:grid;gap:14px}
 .cp-sobre img{width:100%;max-height:320px;object-fit:cover;border-radius:20px;display:block}
 .cp-sobre p{margin:0;line-height:1.6;white-space:pre-line;color:var(--tinta)}

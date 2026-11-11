@@ -97,7 +97,7 @@ export function Avisos() {
           onClick={() => cerrar(a.id)}
         >
           <span className="aviso-icono" aria-hidden="true">
-            {ICONOS[a.tipo] ?? <><Icono n="check" tam={15} className="it" /></>}
+            <Icono n={ICONOS[a.tipo] ?? 'check'} tam={16} ancho={2.2} />
           </span>
           {a.texto}
         </button>
