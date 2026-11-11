@@ -182,12 +182,10 @@ export default function Agotados({ restaurante, soloPlatos = false }) {
                 </div>
               ) : (
                 <div style={{ display: 'grid', gap: 8 }}>
-                  {agotados.length > 0 && (
-                    <div style={{ display: 'grid', gap: 2 }}>
-                      <small style={{ ...s.seccion, color: 'var(--rosa-tinta)' }}>Agotados hoy · {agotados.length}</small>
-                      {agotados.map(fila)}
-                    </div>
-                  )}
+                  {/* Línea fija (siempre ocupa el mismo alto): así la lista no salta al marcar o desmarcar */}
+                  <small style={{ ...s.seccion, color: agotados.length ? 'var(--rosa-tinta)' : 'var(--suave)', minHeight: 20 }}>
+                    {agotados.length ? `Agotados hoy · ${agotados.length}` : 'Nada agotado por ahora'}
+                  </small>
                   {grupos.map((g) => {
                     const abierto = grupoAbierto === g.tipo
                     const n = g.items.filter((p) => estaAgotado(p, hoy)).length

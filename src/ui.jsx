@@ -75,7 +75,7 @@ export function Avisos() {
   useEffect(
     () =>
       escucharAvisos((a) => {
-        setLista((l) => [...l.slice(-2), { ...a, saliendo: false }])
+        setLista(() => [{ ...a, saliendo: false }]) // un solo aviso a la vez: el nuevo reemplaza al anterior
         setTimeout(() => setLista((l) => l.map((x) => (x.id === a.id ? { ...x, saliendo: true } : x))), 2400)
         setTimeout(() => setLista((l) => l.filter((x) => x.id !== a.id)), 2750)
       }),
