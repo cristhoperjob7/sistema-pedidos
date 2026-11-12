@@ -115,7 +115,8 @@ function Panel({ sesion }) {
   // Si la página se abrió en una pestaña aparte, se cierra; si no se puede, se vuelve al panel.
   function volverDeEstadisticas() {
     sentir('toque')
-    window.close()
+    // Solo se intenta cerrar si esta pestaña la abrió el panel; si no, se vuelve al panel aquí mismo.
+    if (window.opener) window.close()
     setTimeout(() => {
       window.history.replaceState(null, '', window.location.pathname + window.location.search)
       setRuta('')

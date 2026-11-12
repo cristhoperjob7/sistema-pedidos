@@ -21,7 +21,6 @@ export default function Caja({ restaurante }) {
   const [res, setRes] = useState(null)
   const [historial, setHistorial] = useState([])
   const [error, setError] = useState('')
-  const [fondo, setFondo] = useState('')
   const [contado, setContado] = useState('')
   const [nota, setNota] = useState('')
   const [confirmar, setConfirmar] = useState(false)
@@ -74,9 +73,14 @@ export default function Caja({ restaurante }) {
   // Con pagos divididos una cuenta aparece en varios métodos: el total de cuentas viene aparte.
   const pedidos = res.pedidos != null ? Number(res.pedidos) : metodos.reduce((n, m) => n + Number(m.pedidos), 0)
   const efVentas = metodos.filter((m) => esEfectivo(m.nombre)).reduce((n, m) => n + Number(m.ventas) + Number(m.propinas), 0)
-  const fondoTurnos = turnos.reduce((n, x) => n + Number(x.fondo_inicial), 0)
+  // El fondo del día es el de la primera caja que se abrió ese día (no se escribe a mano).
+  const zonaDia = restaurante.zona_horaria || 'America/Santiago'
+  const primeraCaja = turnos
+    .filter((x) => new Date(x.abierto_en).toLocaleDateString('en-CA', { timeZone: zonaDia }) === dia)
+    .sort((a, b) => new Date(a.abierto_en) - new Date(b.abierto_en))[0]
+  const fondoDia = primeraCaja ? Number(primeraCaja.fondo_inicial) : 0
   const hayTurnoAbierto = turnos.some((x) => x.cerrado_en == null)
-  const fondoN = leerPrecio(fondo || '0', restaurante) ?? 0
+  const fondoN = fondoDia
   const esperado = fondoN + efVentas
   const contadoN = contado === '' ? null : leerPrecio(contado, restaurante)
   const diferencia = contadoN == null ? null : contadoN - esperado
@@ -105,7 +109,6 @@ export default function Caja({ restaurante }) {
     sentir('toque', 'exito')
     avisar(`Caja del ${fechaLarga(dia)} cerrada`, 'ok')
     setConfirmar(false)
-    setFondo('')
     setContado('')
     setNota('')
     cargar()
@@ -210,11 +213,6 @@ export default function Caja({ restaurante }) {
             </small>
           </div>
         ))}
-        {fondoTurnos > 0 && !cierre && (
-          <button className="btn btn-sec btn-chico" style={{ justifySelf: 'start' }} onClick={() => setFondo(soloPrecio(String(fondoTurnos), restaurante))}>
-            Usar fondos de las cajas ({$(fondoTurnos)}) como fondo del día
-          </button>
-        )}
         <Confirmar
           abierto={!!cerrarTurno}
           titulo={`Cerrar la caja de ${cerrarTurno?.nombre ?? ''}`}
@@ -276,11 +274,15 @@ export default function Caja({ restaurante }) {
       ) : (
         <div className="tarjeta" style={{ padding: 14, display: 'grid', gap: 12 }}>
           <b>Cerrar la caja</b>
-          <label style={{ display: 'grid', gap: 4 }}>
-            <span style={{ fontWeight: 700 }}>Fondo inicial en efectivo</span>
-            <small className="suave">El dinero con el que partió la caja (puede ser 0).</small>
-            <input className="campo-chico" inputMode="decimal" placeholder="0" value={fondo} onChange={(e) => setFondo(soloPrecio(e.target.value, restaurante))} />
-          </label>
+          <div style={s.fila}>
+            <span>
+              <span style={{ fontWeight: 700 }}>Fondo inicial en efectivo</span>
+              <small className="suave" style={{ display: 'block' }}>
+                {primeraCaja ? `Lo anotó ${primeraCaja.nombre} al abrir su caja. No se puede cambiar.` : 'Nadie abrió caja este día.'}
+              </small>
+            </span>
+            <b style={{ fontSize: 18 }}>{$(fondoDia)}</b>
+          </div>
           <div style={s.fila}>
             <span>Efectivo que debería haber<small className="suave" style={{ display: 'block' }}>fondo + ventas y propinas en efectivo</small></span>
             <b style={{ fontSize: 18 }}>{$(esperado)}</b>

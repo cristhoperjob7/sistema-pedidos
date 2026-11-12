@@ -20,6 +20,17 @@ const etiquetaPedido = (p, mesas) =>
 const MESA_LLEVAR = { id: null, numero: null, nombre: null, llevar: true }
 // Método de pago "Efectivo" (misma regla que usa el cierre de caja): pide con cuánto paga el cliente y calcula el vuelto.
 const esEfectivo = (nombre) => /(efectivo|cash)/i.test(nombre ?? '')
+const esTransferencia = (nombre) => /transfer/i.test(nombre ?? '')
+// Datos bancarios guardados por el administrador en el método de pago, en orden de lectura.
+const CAMPOS_TRANSF = [
+  ['titular', 'Titular'],
+  ['rut', 'RUT'],
+  ['banco', 'Banco'],
+  ['tipo_cuenta', 'Tipo de cuenta'],
+  ['numero', 'N° de cuenta'],
+  ['correo', 'Correo'],
+]
+const lineasTransf = (m) => CAMPOS_TRANSF.map(([k, t]) => [t, String(m?.datos?.[k] ?? '').trim()]).filter(([, v]) => v)
 
 // ¿La pantalla es lo bastante ancha (tablet horizontal o computador) para mostrar mesas y cuenta lado a lado?
 function useAnchoGrande(minimo) {
@@ -36,7 +47,7 @@ function useAnchoGrande(minimo) {
 
 // Pantallas del salón: mapa de mesas, pedidos para llevar, toma de pedido y cobro.
 // rol: 'admin' o 'mesera'. Solo cambia lo que se muestra; la base de datos hace cumplir los permisos.
-export default function Mesera({ restaurante, rol = 'mesera' }) {
+export default function Mesera({ restaurante, rol = 'mesera', cajaDe = null }) {
   const [datos, setDatos] = useState(null)
   const [error, setError] = useState('')
   const [juntando, setJuntando] = useState(false) // ventana para juntar mesas (antes de pedir)
@@ -241,6 +252,7 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
         restaurante={restaurante}
         datos={datos}
         rol={rol}
+        cajaDe={cajaDe}
         mesa={mesa}
         pedido={pedido}
         items={items}
@@ -769,7 +781,6 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
         : rotulo
       avisar(hayCocina ? `Enviado a cocina · ${etiquetaEnvio}` : `Añadido al pedido · ${etiquetaEnvio}`, hayCocina ? 'cocina' : 'ok')
       setPidiendoNombre(false)
-      if (esLlevarVista && !pedido && ok.pedido_id) onCreado(ok.pedido_id)
       setResaltar(new Set(enviados))
       clearTimeout(tResaltar.current)
       tResaltar.current = setTimeout(() => setResaltar(new Set()), 1600)
@@ -782,6 +793,8 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
       })
       setEditandoNota(null)
       recargar()
+      // Enviado: de vuelta a la vista general de las mesas.
+      onVolver()
     }
   }
 
@@ -1435,7 +1448,7 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
   )
 }
 
-function Cobrar({ restaurante, datos, rol, mesa, pedido, items, onVolver, onListo }) {
+function Cobrar({ restaurante, datos, rol, cajaDe, mesa, pedido, items, onVolver, onListo }) {
   const [error, setError] = useState('')
   const [trabajando, setTrabajando] = useState(null) // id del método (o 'dividido') que se está cobrando
   const [propinaModo, setPropinaModo] = useState('10') // '0' | '5' | '10' | 'otro'
@@ -1460,6 +1473,10 @@ function Cobrar({ restaurante, datos, rol, mesa, pedido, items, onVolver, onList
   const [divAbierto, setDivAbierto] = useState(false)
   const [lineasPago, setLineasPago] = useState([])
   const [personas, setPersonas] = useState('2')
+
+  // Transferencia: se muestran los datos de la cuenta antes de confirmar.
+  const [transf, setTransf] = useState(null)
+  const [copiado, setCopiado] = useState(false)
 
   const esAdmin = rol === 'admin'
 
@@ -1507,6 +1524,25 @@ function Cobrar({ restaurante, datos, rol, mesa, pedido, items, onVolver, onList
     setError('')
     setRecibido('')
     setEfectivo(metodo)
+  }
+
+  function abrirTransferencia(metodo) {
+    if (propinaInvalida) return setError('La propina no es válida.')
+    sentir('toque')
+    setError('')
+    setCopiado(false)
+    setTransf(metodo)
+  }
+
+  async function copiarTransf() {
+    const texto = [...lineasTransf(transf).map(([k, v]) => `${k}: ${v}`), `Monto: ${formatear(aPagar, restaurante)}`].join('\n')
+    try {
+      await navigator.clipboard.writeText(texto)
+      sentir('toque', 'tic')
+      setCopiado(true)
+    } catch {
+      setError('No se pudo copiar. Puedes dictar los datos.')
+    }
   }
 
   // Cobra la cuenta con una o varias líneas de pago. Una cortesía no lleva pagos.
@@ -1663,16 +1699,22 @@ function Cobrar({ restaurante, datos, rol, mesa, pedido, items, onVolver, onList
   }
 
   return (
-    <div className="entra-derecha" style={s.contenido}>
-      <div style={s.cabecera}>
+    <div className="entra-derecha" style={{ ...s.contenido, display: 'grid', gap: 12 }}>
+      <div style={{ ...s.cabecera, marginBottom: 0 }}>
         <button className="btn btn-fantasma" onClick={onVolver} disabled={!!trabajando}>
           ‹ Volver
         </button>
         <h2 style={{ margin: 0, overflowWrap: 'anywhere', flex: 1, minWidth: 0 }}>{mesa.llevar ? `Cobrar · ${etiquetaLlevar(pedido)}` : `Cobrar mesa ${mesa.numero}`}</h2>
         <button className="btn btn-sec" onClick={verPrecuenta} disabled={!!trabajando}>
-          Precuenta
+          <Icono n="impresora" tam={16} className="it" /> Precuenta
         </button>
       </div>
+
+      {cajaDe && (
+        <p className="nota aparece" style={{ margin: 0 }}>
+          <Icono n="alerta" tam={15} className="it" /> La caja la tiene {cajaDe}. Puedes mostrar la precuenta, pero el cobro lo hace esa persona.
+        </p>
+      )}
 
       <div className="tarjeta" style={{ display: 'grid', gap: 2, padding: 6 }}>
         <small className="suave" style={{ padding: '6px 10px 2px' }}>
@@ -1686,34 +1728,34 @@ function Cobrar({ restaurante, datos, rol, mesa, pedido, items, onVolver, onList
             <b className="numero">{formatear(l.total, restaurante)}</b>
           </div>
         ))}
-        {desc && (
-          <div className="entra" style={{ ...s.lineaCobro, color: 'var(--rosa-tinta)' }}>
-            <span style={{ flex: 1, minWidth: 0 }}>
+        {desc ? (
+          <div className="entra" style={{ ...s.lineaCobro, alignItems: 'center', flexWrap: 'wrap', color: 'var(--rosa-tinta)' }}>
+            <span style={{ flex: '1 1 160px', minWidth: 0 }}>
               <b>{desc.etiqueta}</b> <small className="suave">· {desc.motivo}</small>
             </span>
             <b className="numero">− {formatear(descuento, restaurante)}</b>
+            <span style={{ display: 'flex', gap: 6, width: '100%', justifyContent: 'flex-end' }}>
+              <button className="btn btn-sec btn-chico" disabled={!!trabajando || !!cajaDe} onClick={abrirDescuento}>Cambiar</button>
+              <button
+                className="btn btn-sec btn-chico"
+                disabled={!!trabajando}
+                onClick={() => {
+                  sentir('toque')
+                  setDesc(null)
+                }}
+              >
+                Quitar
+              </button>
+            </span>
           </div>
-        )}
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        {desc ? (
-          <>
-            <button className="btn btn-sec" disabled={!!trabajando} onClick={abrirDescuento}>Cambiar descuento</button>
-            <button
-              className="btn btn-fantasma"
-              disabled={!!trabajando}
-              onClick={() => {
-                sentir('toque')
-                setDesc(null)
-              }}
-            >
-              Quitar descuento
-            </button>
-          </>
         ) : (
-          <button className="btn btn-sec" disabled={!!trabajando} onClick={abrirDescuento}>
-            Descuento o cortesía
+          <button
+            className="btn btn-fantasma"
+            style={{ ...s.lineaCobro, justifyContent: 'flex-start', borderRadius: 0, color: 'var(--marca-tinta, var(--marca))', fontWeight: 800 }}
+            disabled={!!trabajando || !!cajaDe}
+            onClick={abrirDescuento}
+          >
+            <Icono n="mas" tam={16} className="it" /> Agregar descuento o cortesía
           </button>
         )}
       </div>
@@ -1767,7 +1809,7 @@ function Cobrar({ restaurante, datos, rol, mesa, pedido, items, onVolver, onList
         </div>
       )}
 
-      <div style={s.totalCobro}>
+      <div style={{ ...s.totalCobro, marginTop: 0 }}>
         <small style={{ opacity: 0.8 }}>{cortesia ? 'Cortesía · nada que cobrar' : 'Total a cobrar'}</small>
         <b style={{ fontSize: 'clamp(30px, 9vw, 40px)', lineHeight: 1.1 }}>
           <NumeroAnimado valor={aPagar} duracion={650} formato={(n) => formatear(n, restaurante)} />
@@ -1780,32 +1822,73 @@ function Cobrar({ restaurante, datos, rol, mesa, pedido, items, onVolver, onList
       )}
 
       {cortesia ? (
-        <button className="btn btn-principal btn-grande" disabled={!!trabajando} onClick={(e) => cobrarCuenta([], e.currentTarget, 'cortesia')}>
+        <button className="btn btn-principal btn-grande" disabled={!!trabajando || !!cajaDe} onClick={(e) => cobrarCuenta([], e.currentTarget, 'cortesia')}>
           {trabajando ? <span className="puntos">Registrando</span> : 'Registrar cortesía'}
         </button>
       ) : (
-        <>
-          <h3 style={s.titulo}>¿Cómo paga?</h3>
+        <div style={{ display: 'grid', gap: 10 }}>
+          <h3 style={{ ...s.titulo, margin: '4px 0 0' }}>¿Cómo paga?</h3>
           <div style={s.pagos}>
             {datos.pagos.map((m, i) => (
               <button
                 key={m.id}
                 className="btn btn-principal btn-grande entra"
                 style={{ animationDelay: `${120 + i * 50}ms`, opacity: trabajando === m.id ? 1 : undefined }}
-                disabled={!!trabajando || propinaInvalida}
-                onClick={(e) => (esEfectivo(m.nombre) ? abrirEfectivo(m) : cobrar(m, e))}
+                disabled={!!trabajando || propinaInvalida || !!cajaDe}
+                onClick={(e) => (esEfectivo(m.nombre) ? abrirEfectivo(m) : esTransferencia(m.nombre) ? abrirTransferencia(m) : cobrar(m, e))}
               >
                 {trabajando === m.id ? <span className="puntos">Cobrando</span> : m.nombre}
               </button>
             ))}
           </div>
           {datos.pagos.length > 0 && aPagar > 0 && (
-            <button className="btn btn-sec" disabled={!!trabajando || propinaInvalida} onClick={abrirDividido}>
-              Dividir o pagar con varios métodos
+            <button
+              className="btn btn-sec btn-bloque"
+              style={{ minHeight: 50 }}
+              disabled={!!trabajando || propinaInvalida || !!cajaDe}
+              onClick={abrirDividido}
+            >
+              <Icono n="personas" tam={17} className="it" /> Dividir la cuenta o pagar con varios métodos
             </button>
           )}
-        </>
+        </div>
       )}
+
+      <Confirmar
+        abierto={!!transf}
+        titulo="Cobro por transferencia"
+        peligro={false}
+        textoConfirmar={trabajando ? 'Cobrando…' : 'Confirmar transferencia'}
+        trabajando={!!trabajando}
+        error={transf ? error : ''}
+        onCancelar={() => setTransf(null)}
+        onConfirmar={(e) => cobrar(transf, e)}
+      >
+        <div style={{ display: 'grid', gap: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+            <span className="suave">Monto a transferir</span>
+            <b className="numero" style={{ fontSize: 22 }}>{formatear(aPagar, restaurante)}</b>
+          </div>
+          {lineasTransf(transf).length > 0 ? (
+            <div style={{ display: 'grid', gap: 6, padding: '12px 14px', borderRadius: 14, background: 'var(--sup)', border: '1px solid var(--linea)' }}>
+              {lineasTransf(transf).map(([k, v]) => (
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                  <span className="suave">{k}</span>
+                  <b style={{ textAlign: 'right', overflowWrap: 'anywhere' }}>{v}</b>
+                </div>
+              ))}
+              <button className="btn btn-sec btn-chico" style={{ justifySelf: 'start', marginTop: 4 }} onClick={copiarTransf}>
+                {copiado ? 'Copiado ✓' : 'Copiar datos'}
+              </button>
+            </div>
+          ) : (
+            <p className="nota" style={{ margin: 0 }}>
+              Aún no hay datos para transferir. El administrador puede cargarlos en “Mesas y ajustes” → Métodos de pago.
+            </p>
+          )}
+          <small className="suave">Confirma solo cuando hayas visto la transferencia recibida.</small>
+        </div>
+      </Confirmar>
 
       <Confirmar
         abierto={!!efectivo}

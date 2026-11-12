@@ -36,13 +36,13 @@ export function abrirPrecuenta({ restaurante, titulo, numero, lineas, subtotal, 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Precuenta · ${esc(titulo)}</title>
 <style>
-  @page { size: 80mm auto; margin: 4mm }
+  @page { size: 80mm 200mm; margin: 0 }
   * { box-sizing: border-box }
   body { margin: 0; background: #e9ecf1; color: #111; font: 13px/1.35 system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact }
   .barra-pantalla { position: sticky; top: 0; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; padding: 10px; background: #14181f; color: #fff; font-size: 14px }
   .barra-pantalla button { border: 0; border-radius: 8px; padding: 9px 16px; font-weight: 700; font-size: 14px; background: #fff; cursor: pointer }
   .barra-pantalla .volver { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.5) }
-  .papel { width: 80mm; max-width: 100%; margin: 14px auto; padding: 5mm 4mm; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.15) }
+  .papel { width: 80mm; max-width: 100%; margin: 14px auto; padding: 4mm 3mm; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.15) }
   .centro { text-align: center }
   .rest { font-size: 16px; font-weight: 800 }
   h1 { margin: 6px 0 0; font-size: 15px; letter-spacing: .12em }
@@ -63,12 +63,15 @@ export function abrirPrecuenta({ restaurante, titulo, numero, lineas, subtotal, 
   @media print {
     body { background: #fff }
     .barra-pantalla { display: none }
-    .papel { width: 100%; margin: 0; padding: 0; box-shadow: none }
+    html, body { width: 80mm; margin: 0 }
+    .papel { width: 80mm; max-width: none; margin: 0; box-shadow: none }
+    tr, .suma div, .sug { break-inside: avoid }
   }
 </style></head><body>
 <div class="barra-pantalla">
   <button class="volver" onclick="(function(){ if (window.opener) { window.close(); setTimeout(function(){ location.href = '${esc(origen)}' }, 300) } else { location.href = '${esc(origen)}' } })()">&larr; Volver al sistema</button>
-  <button onclick="window.print()">Imprimir / Guardar PDF</button>
+  <button onclick="window.print()">Imprimir (papel 80 mm)</button>
+  <span style="opacity:.75;font-size:12.5px">En la ventana de impresión elige la impresora de boletas. Para PDF, elige “Guardar como PDF”.</span>
 </div>
 <div class="papel">
   <div class="centro">
@@ -79,8 +82,8 @@ export function abrirPrecuenta({ restaurante, titulo, numero, lineas, subtotal, 
   <div class="datos"><span><b>${esc(titulo)}</b>${numero != null ? ` · Pedido #${esc(numero)}` : ''}</span><span>${esc(ahora)}</span></div>
   <table>${filas}</table>
   <div class="suma">
-    <div><span>Consumo</span><span>${$(subtotal)}</span></div>
-    ${descuento > 0 ? `<div><span>Descuento${motivoDescuento ? ` (${esc(motivoDescuento)})` : ''}</span><span>− ${$(descuento)}</span></div>` : ''}
+    ${descuento > 0 ? `<div><span>Subtotal</span><span>${$(subtotal)}</span></div>
+    <div><span>Descuento${motivoDescuento ? ` (${esc(motivoDescuento)})` : ''}</span><span>− ${$(descuento)}</span></div>` : ''}
     <div class="total"><span>Total</span><span>${$(neto)}</span></div>
   </div>
   ${propinaPct > 0 ? `<div class="sug">
@@ -90,6 +93,19 @@ export function abrirPrecuenta({ restaurante, titulo, numero, lineas, subtotal, 
   </div>` : ''}
   <div class="pie">¡Gracias por su visita!</div>
 </div>
+<script>
+  // El papel mide 80 mm de ancho y el largo justo de la cuenta (sin hoja en blanco al final).
+  (function () {
+    function ajustar() {
+      var p = document.querySelector('.papel')
+      var mm = Math.ceil(p.getBoundingClientRect().height * 25.4 / 96) + 2
+      var st = document.getElementById('pagina') || document.head.appendChild(Object.assign(document.createElement('style'), { id: 'pagina' }))
+      st.textContent = '@page { size: 80mm ' + mm + 'mm; margin: 0 }'
+    }
+    ajustar()
+    window.addEventListener('beforeprint', ajustar)
+  })()
+</script>
 </body></html>`
 
   const w = window.open('', '_blank')

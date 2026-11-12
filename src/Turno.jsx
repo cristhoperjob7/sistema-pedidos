@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { cloneElement, isValidElement, useCallback, useEffect, useState } from 'react'
 import Icono from './iconos'
 import { supabase } from './supabase'
 import { formatear, leerPrecio, soloPrecio } from './moneda'
@@ -27,15 +27,20 @@ export default function Turno({ restaurante, children }) {
   const [nota, setNota] = useState('')
   const [errorCierre, setErrorCierre] = useState('')
   const [resultado, setResultado] = useState(null)
+  const [otraCaja, setOtraCaja] = useState(null) // { nombre, abierto_en } si la caja la tiene otra persona
+  const [sinCaja, setSinCaja] = useState(false) // entró solo a tomar pedidos
 
   const cargar = useCallback(async () => {
     const { data: u } = await supabase.auth.getUser()
     const uid = u?.user?.id
-    const [t, a, m] = await Promise.all([
+    const [t, a, m, c] = await Promise.all([
       supabase.from('turnos_caja').select('*').eq('restaurante_id', restaurante.id).eq('usuario_id', uid).is('cerrado_en', null).maybeSingle(),
       supabase.rpc('admins_para_caja', { p_restaurante: restaurante.id }),
       supabase.from('miembros').select('nombre').eq('restaurante_id', restaurante.id).eq('usuario_id', uid).maybeSingle(),
+      supabase.rpc('caja_abierta', { p_restaurante: restaurante.id }),
     ])
+    setOtraCaja(c.data && !c.data.mia ? c.data : null)
+    if (!c.data || c.data.mia) setSinCaja(false)
     setTurno(t.data ?? null)
     setAdmins(a.data ?? [])
     setYo(m.data?.nombre ?? '')
@@ -65,6 +70,7 @@ export default function Turno({ restaurante, children }) {
     setPin('')
     if (error || !data?.ok) {
       sentir('toque', 'error')
+      cargar()
       return setError(error?.message ?? data?.error ?? 'No se pudo abrir la caja.')
     }
     sentir('toque', 'exito')
@@ -133,6 +139,27 @@ export default function Turno({ restaurante, children }) {
     )
   }
 
+  // ---- La caja la tiene otra persona y se entró solo a tomar pedidos
+  if (sinCaja && otraCaja) {
+    return (
+      <div style={{ display: 'grid', gap: 12 }}>
+        <div style={s.barra}>
+          <span style={{ minWidth: 0 }}>
+            <b>Sin caja · solo pedidos</b>
+            <small className="suave" style={{ display: 'block' }}>
+              La caja la tiene {otraCaja.nombre}: cobra esa persona.
+            </small>
+          </span>
+          <button className="btn btn-sec btn-chico" onClick={() => { sentir('toque'); setSinCaja(false); cargar() }}>
+            Abrir mi caja
+          </button>
+        </div>
+        <AvisosQR restaurante={restaurante} />
+        {isValidElement(children) ? cloneElement(children, { cajaDe: otraCaja.nombre }) : children}
+      </div>
+    )
+  }
+
   // ---- Sin caja: formulario de apertura
   const dif = resultado ? Number(resultado.diferencia) : null
   return (
@@ -148,6 +175,23 @@ export default function Turno({ restaurante, children }) {
         </div>
       )}
 
+      {otraCaja ? (
+        <div className="tarjeta aparece" style={{ padding: 18, display: 'grid', gap: 12 }}>
+          <div>
+            <h2 style={{ margin: 0 }}>La caja ya está abierta</h2>
+            <small className="suave">
+              La tiene <b>{otraCaja.nombre}</b> desde {hora(otraCaja.abierto_en, restaurante.zona_horaria)}. Solo puede haber una caja abierta a la vez:
+              para abrir la tuya, primero tiene que cerrarse esa (la cierra esa persona o un administrador en Cierre de caja).
+            </small>
+          </div>
+          <button className="btn btn-principal" onClick={() => { sentir('toque'); setSinCaja(true) }}>
+            Entrar a tomar pedidos (sin cobrar)
+          </button>
+          <button className="btn btn-sec" onClick={() => { sentir('toque'); cargar() }}>
+            Ya la cerraron · revisar de nuevo
+          </button>
+        </div>
+      ) : (
       <form className="tarjeta" style={{ padding: 18, display: 'grid', gap: 14 }} onSubmit={abrir}>
         <div>
           <h2 style={{ margin: 0 }}>Abrir caja</h2>
@@ -199,6 +243,7 @@ export default function Turno({ restaurante, children }) {
           </>
         )}
       </form>
+      )}
     </div>
   )
 }

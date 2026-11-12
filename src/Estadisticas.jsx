@@ -531,7 +531,7 @@ export default function Estadisticas({ restaurante, onVolver }) {
     <div style={s.pagina}>
       <div style={s.cabecera}>
         <button className="btn btn-fantasma" onClick={onVolver}>
-          ‹ Volver al panel
+          ‹ Volver al inicio
         </button>
       </div>
       <div className="aparece">
@@ -554,7 +554,7 @@ export default function Estadisticas({ restaurante, onVolver }) {
   )
 }
 
-// Botón para llevar a esta página (se pone en los reportes). Abre otra pestaña.
+// Botón para llevar a esta sección (se pone en los reportes).
 export function BotonEstadisticas() {
   return (
     <button
@@ -562,13 +562,12 @@ export function BotonEstadisticas() {
       style={{ display: 'grid', gap: 2, justifyItems: 'start', textAlign: 'left', padding: '12px 14px', whiteSpace: 'normal', boxSizing: 'border-box', maxWidth: '100%' }}
       onClick={() => {
         sentir('toque')
-        const url = `${window.location.pathname}${window.location.search}#/estadisticas`
-        const nueva = window.open(url, '_blank')
-        if (!nueva) window.location.hash = '#/estadisticas'
+        // Se abre dentro del mismo panel (abrir otra pestaña fallaba en el celular).
+        window.dispatchEvent(new CustomEvent('panel-ir', { detail: 'estadisticas' }))
       }}
     >
-      <b><Icono n="barras" tam={15} className="it" /> Estadísticas avanzadas ↗</b>
-      <small style={{ color: 'var(--suave)', fontWeight: 600 }}>Tiempos de cocina, horas punta y más. Se abre en otra pestaña.</small>
+      <b><Icono n="barras" tam={15} className="it" /> Estadísticas avanzadas</b>
+      <small style={{ color: 'var(--suave)', fontWeight: 600 }}>Tiempos de cocina, horas punta y más.</small>
     </button>
   )
 }

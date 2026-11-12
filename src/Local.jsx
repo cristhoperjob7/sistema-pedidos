@@ -205,7 +205,8 @@ export default function Local({ restaurante }) {
       <section className="tarjeta" style={s.caja}>
         <h3 style={{ margin: 0 }}>Métodos de pago</h3>
         {pagos.map((p) => (
-          <div key={p.id} className="entra" style={{ ...s.fila, opacity: p.activo ? 1 : 0.55 }}>
+          <div key={p.id} style={{ display: 'grid', gap: 6 }}>
+          <div className="entra" style={{ ...s.fila, opacity: p.activo ? 1 : 0.55 }}>
             <Campo
               className="campo-chico"
               style={{ flex: '1 1 140px', minWidth: 0 }}
@@ -221,6 +222,10 @@ export default function Local({ restaurante }) {
             >
               {p.activo ? 'Desactivar' : 'Activar'}
             </button>
+          </div>
+          {/transfer/i.test(p.nombre) && (
+            <DatosTransferencia metodo={p} onGuardar={(datos) => actualizar('metodos_pago', { id: p.id }, { datos })} />
+          )}
           </div>
         ))}
         <form onSubmit={agregarPago} style={s.nuevo}>
@@ -296,4 +301,63 @@ const s = {
   confirmar: { display: 'grid', gap: 10, padding: 12, borderRadius: 14, background: 'var(--rosa)', border: '1px solid var(--borde-rosa)' },
   etiqueta: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', fontSize: 15 },
   puntoColor: { display: 'inline-block', width: 10, height: 10, borderRadius: '50%', marginRight: 4 },
+}
+
+// Datos de la cuenta a la que transfieren los clientes. Se muestran al cobrar con "Transferencia".
+const CAMPOS_TRANSF = [
+  ['titular', 'Titular', 'Ej: Jiovanna Pérez'],
+  ['rut', 'RUT', 'Ej: 12.345.678-9'],
+  ['banco', 'Banco', 'Ej: BancoEstado'],
+  ['tipo_cuenta', 'Tipo de cuenta', 'Ej: Cuenta RUT / Corriente / Vista'],
+  ['numero', 'N° de cuenta', 'Ej: 12345678'],
+  ['correo', 'Correo para el comprobante', 'Ej: pagos@milocal.cl'],
+]
+
+function DatosTransferencia({ metodo, onGuardar }) {
+  const [abierto, setAbierto] = useState(false)
+  const [v, setV] = useState({})
+  const [guardando, setGuardando] = useState(false)
+  const tiene = CAMPOS_TRANSF.some(([k]) => String(metodo.datos?.[k] ?? '').trim())
+
+  function abrir() {
+    sentir('toque')
+    setV(Object.fromEntries(CAMPOS_TRANSF.map(([k]) => [k, metodo.datos?.[k] ?? ''])))
+    setAbierto(true)
+  }
+
+  async function guardar(e) {
+    e.preventDefault()
+    setGuardando(true)
+    const limpio = Object.fromEntries(CAMPOS_TRANSF.map(([k]) => [k, String(v[k] ?? '').trim().slice(0, 120)]).filter(([, x]) => x))
+    const ok = await onGuardar(Object.keys(limpio).length ? limpio : null)
+    setGuardando(false)
+    if (ok) {
+      vibrar('exito')
+      avisar('Datos de transferencia guardados')
+      setAbierto(false)
+    }
+  }
+
+  if (!abierto) {
+    return (
+      <button className="btn btn-chico btn-suave" style={{ justifySelf: 'start' }} onClick={abrir}>
+        {tiene ? 'Editar datos para transferir' : '+ Agregar datos para transferir'}
+      </button>
+    )
+  }
+  return (
+    <form onSubmit={guardar} className="aparece" style={{ display: 'grid', gap: 8, padding: 12, borderRadius: 14, border: '1px solid var(--linea)' }}>
+      <small className="suave">Se muestran a la mesera al cobrar con transferencia, para dárselos al cliente.</small>
+      {CAMPOS_TRANSF.map(([k, t, ph]) => (
+        <label key={k} style={{ display: 'grid', gap: 3 }}>
+          <span style={{ fontWeight: 700, fontSize: 14 }}>{t}</span>
+          <input className="campo-chico" maxLength={120} placeholder={ph} value={v[k] ?? ''} onChange={(e) => setV((x) => ({ ...x, [k]: e.target.value }))} />
+        </label>
+      ))}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button type="button" className="btn btn-chico btn-sec" onClick={() => setAbierto(false)}>Cancelar</button>
+        <button className="btn btn-chico btn-principal" disabled={guardando}>{guardando ? 'Guardando…' : 'Guardar datos'}</button>
+      </div>
+    </form>
+  )
 }
