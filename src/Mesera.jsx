@@ -4,6 +4,7 @@ import { formatear, leerPrecio, soloPrecio } from './moneda'
 import { Cargando, Desplegable, Mensaje, NumeroAnimado, Segmento, Confirmar } from './ui'
 import { avisar, celebrar, sentir, sonar, vibrar } from './feedback'
 import { createPortal } from 'react-dom'
+import { abrirPrecuenta } from './precuenta'
 import Anclar from './Anclar'
 import Icono from './iconos'
 import './orden.css'
@@ -239,6 +240,7 @@ export default function Mesera({ restaurante, rol = 'mesera' }) {
       <Cobrar
         restaurante={restaurante}
         datos={datos}
+        rol={rol}
         mesa={mesa}
         pedido={pedido}
         items={items}
@@ -1433,14 +1435,33 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
   )
 }
 
-function Cobrar({ restaurante, datos, mesa, pedido, items, onVolver, onListo }) {
+function Cobrar({ restaurante, datos, rol, mesa, pedido, items, onVolver, onListo }) {
   const [error, setError] = useState('')
-  const [trabajando, setTrabajando] = useState(null) // id del método que se está cobrando
+  const [trabajando, setTrabajando] = useState(null) // id del método (o 'dividido') que se está cobrando
   const [propinaModo, setPropinaModo] = useState('10') // '0' | '5' | '10' | 'otro'
   const [propinaOtro, setPropinaOtro] = useState('')
   const [efectivo, setEfectivo] = useState(null) // método "Efectivo" mientras se pide el monto recibido
   const [recibido, setRecibido] = useState('')
   const entradaRecibido = useRef(null)
+
+  // Descuento / cortesía aplicado: { monto, motivo, adminId, pin, etiqueta }
+  const [desc, setDesc] = useState(null)
+  const [descAbierto, setDescAbierto] = useState(false)
+  const [dTipo, setDTipo] = useState('10') // '5' | '10' | '15' | '20' | '100' (cortesía) | 'monto'
+  const [dMonto, setDMonto] = useState('')
+  const [dMotivo, setDMotivo] = useState('')
+  const [admins, setAdmins] = useState([])
+  const [dAdmin, setDAdmin] = useState('')
+  const [dPin, setDPin] = useState('')
+  const [dError, setDError] = useState('')
+  const [dTrabajando, setDTrabajando] = useState(false)
+
+  // Pago dividido: varias líneas método + monto
+  const [divAbierto, setDivAbierto] = useState(false)
+  const [lineasPago, setLineasPago] = useState([])
+  const [personas, setPersonas] = useState('2')
+
+  const esAdmin = rol === 'admin'
 
   const lineas = useMemo(() => {
     const g = new Map()
@@ -1454,13 +1475,17 @@ function Cobrar({ restaurante, datos, mesa, pedido, items, onVolver, onListo }) 
   }, [items])
   const total = lineas.reduce((t, l) => t + l.total, 0)
 
-  // Propina: sugerida (10 %) o cualquier otro monto. Es voluntaria: siempre se puede quitar.
   const decimales = restaurante.moneda_decimales ?? 0
   const redondear = (n) => Math.round(n * 10 ** decimales) / 10 ** decimales
+  const descuento = desc ? Math.min(desc.monto, total) : 0
+  const neto = redondear(total - descuento)
+  const cortesia = total > 0 && neto === 0
+
+  // Propina: sugerida (10 %) o cualquier otro monto, siempre sobre lo ya descontado. Es voluntaria.
   const otro = leerPrecio(propinaOtro === '' ? '0' : propinaOtro, restaurante)
-  const propina = propinaModo === 'otro' ? (otro ?? 0) : redondear((total * Number(propinaModo)) / 100)
-  const propinaInvalida = propinaModo === 'otro' && otro === null
-  const aPagar = total + propina
+  const propina = cortesia ? 0 : propinaModo === 'otro' ? (otro ?? 0) : redondear((neto * Number(propinaModo)) / 100)
+  const propinaInvalida = !cortesia && propinaModo === 'otro' && otro === null
+  const aPagar = redondear(neto + propina)
 
   // Efectivo: con cuánto paga el cliente y cuánto hay que devolver.
   const recibidoNum = leerPrecio(recibido, restaurante)
@@ -1474,6 +1499,8 @@ function Cobrar({ restaurante, datos, mesa, pedido, items, onVolver, onListo }) 
     return () => clearTimeout(t)
   }, [efectivo])
 
+  const etiquetaCuenta = pedido && mesa.llevar ? etiquetaLlevar(pedido) : `Mesa ${mesa.numero}`
+
   function abrirEfectivo(metodo) {
     if (propinaInvalida) return setError('La propina no es válida.')
     sentir('toque')
@@ -1482,24 +1509,145 @@ function Cobrar({ restaurante, datos, mesa, pedido, items, onVolver, onListo }) 
     setEfectivo(metodo)
   }
 
-  async function cobrar(metodo, e) {
-    const boton = e.currentTarget
+  // Cobra la cuenta con una o varias líneas de pago. Una cortesía no lleva pagos.
+  async function cobrarCuenta(pagos, boton, clave) {
     if (propinaInvalida) return setError('La propina no es válida.')
     sentir('toque')
     setError('')
-    setTrabajando(metodo.id)
-    const { error } = await supabase.rpc('cobrar_pedido', { p_pedido: pedido.id, p_metodo: metodo.id, p_propina: propina })
-    if (error) {
+    setTrabajando(clave)
+    const { data, error } = await supabase.rpc('cobrar_cuenta', {
+      p_pedido: pedido.id,
+      p_pagos: pagos,
+      p_propina: propina,
+      p_descuento: descuento,
+      p_motivo: desc ? desc.motivo : null,
+      p_admin: desc && !esAdmin ? desc.adminId : null,
+      p_pin: desc && !esAdmin ? desc.pin : null,
+    })
+    if (error || data?.ok === false) {
       setTrabajando(null)
-      setError(error.message)
+      setError(error?.message ?? data?.error ?? 'No se pudo cobrar.')
       return
     }
     celebrar(boton)
     vibrar('exito')
     sonar('cobro')
-    avisar(`${pedido && mesa.llevar ? etiquetaLlevar(pedido) : `Mesa ${mesa.numero}`} cobrada · ${formatear(aPagar, restaurante)}`, 'cobro')
+    avisar(cortesia ? `${etiquetaCuenta} · cortesía registrada` : `${etiquetaCuenta} cobrada · ${formatear(aPagar, restaurante)}`, 'cobro')
     // Una pausa breve para que se alcance a disfrutar la confirmación antes de volver.
     setTimeout(onListo, 550)
+  }
+
+  const cobrar = (metodo, e) => cobrarCuenta([{ metodo: metodo.id, monto: aPagar }], e.currentTarget, metodo.id)
+
+  // ---------- Descuento ----------
+  async function abrirDescuento() {
+    sentir('toque')
+    setDError('')
+    setDPin('')
+    if (!desc) {
+      setDTipo('10')
+      setDMonto('')
+      setDMotivo('')
+    }
+    setDescAbierto(true)
+    if (!esAdmin && admins.length === 0) {
+      const { data } = await supabase.rpc('admins_para_caja', { p_restaurante: restaurante.id })
+      setAdmins(data ?? [])
+      if (data?.length === 1) setDAdmin(data[0].usuario_id)
+    }
+  }
+
+  const montoDesc =
+    dTipo === 'monto'
+      ? (() => {
+          const v = leerPrecio(dMonto === '' ? '0' : dMonto, restaurante)
+          return v == null ? null : Math.min(v, total)
+        })()
+      : redondear((total * Number(dTipo)) / 100)
+
+  async function aplicarDescuento() {
+    setDError('')
+    if (montoDesc == null || montoDesc <= 0) return setDError('Indica cuánto se descuenta.')
+    if (dTipo === 'monto' && leerPrecio(dMonto, restaurante) > total) return setDError('El descuento no puede superar la cuenta.')
+    const motivo = dMotivo.trim()
+    if (motivo.length < 3) return setDError('Escribe el motivo (mínimo 3 letras).')
+    if (!esAdmin) {
+      if (!dAdmin) return setDError('Elige quién autoriza.')
+      if (!/^\d{4}$/.test(dPin)) return setDError('El PIN del administrador tiene 4 dígitos.')
+      setDTrabajando(true)
+      const { data, error } = await supabase.rpc('verificar_pin_admin', { p_restaurante: restaurante.id, p_admin: dAdmin, p_pin: dPin })
+      setDTrabajando(false)
+      if (error) return setDError(error.message)
+      if (data?.ok === false) {
+        setDPin('')
+        return setDError(data.error ?? 'PIN incorrecto.')
+      }
+    }
+    sentir('exito')
+    setDesc({
+      monto: montoDesc,
+      motivo,
+      adminId: dAdmin,
+      pin: dPin,
+      etiqueta: dTipo === '100' || montoDesc >= total ? 'Cortesía' : dTipo === 'monto' ? 'Descuento' : `Descuento ${dTipo} %`,
+    })
+    setDescAbierto(false)
+  }
+
+  // ---------- Pago dividido ----------
+  const metodoInicial = datos.pagos[0]?.id ?? ''
+  const montoLinea = (l) => leerPrecio(l.monto === '' ? '0' : l.monto, restaurante)
+  const sumaLineas = redondear(lineasPago.reduce((t, l) => t + (montoLinea(l) ?? 0), 0))
+  const pendiente = redondear(aPagar - sumaLineas)
+  const lineasValidas = lineasPago.length > 0 && lineasPago.every((l) => l.metodo && (montoLinea(l) ?? 0) > 0)
+  const divisionLista = lineasValidas && pendiente === 0
+
+  function repartir(n) {
+    const k = Math.max(1, Math.min(12, Number(n) || 1))
+    const base = Math.floor((aPagar / k) * 10 ** decimales) / 10 ** decimales
+    const nuevas = Array.from({ length: k }, (_, i) => ({
+      metodo: lineasPago[i]?.metodo || metodoInicial,
+      monto: String(i === k - 1 ? redondear(aPagar - base * (k - 1)) : base),
+    }))
+    setLineasPago(nuevas)
+  }
+
+  function abrirDividido() {
+    if (propinaInvalida) return setError('La propina no es válida.')
+    sentir('toque')
+    setError('')
+    setPersonas('2')
+    const base = Math.floor((aPagar / 2) * 10 ** decimales) / 10 ** decimales
+    setLineasPago([
+      { metodo: metodoInicial, monto: String(base) },
+      { metodo: metodoInicial, monto: String(redondear(aPagar - base)) },
+    ])
+    setDivAbierto(true)
+  }
+
+  const cambiarLinea = (i, parche) => setLineasPago((ls) => ls.map((l, j) => (j === i ? { ...l, ...parche } : l)))
+
+  function confirmarDividido(e) {
+    if (!divisionLista) return
+    cobrarCuenta(
+      lineasPago.map((l) => ({ metodo: l.metodo, monto: montoLinea(l) })),
+      e.currentTarget,
+      'dividido'
+    )
+  }
+
+  function verPrecuenta() {
+    sentir('toque')
+    const ok = abrirPrecuenta({
+      restaurante,
+      titulo: etiquetaCuenta,
+      numero: pedido.numero,
+      lineas,
+      subtotal: total,
+      descuento,
+      motivoDescuento: desc?.motivo ?? '',
+    })
+    if (!ok) setError('El navegador bloqueó la ventana. Permite las ventanas emergentes para este sitio e inténtalo de nuevo.')
   }
 
   if (!pedido) {
@@ -1520,7 +1668,10 @@ function Cobrar({ restaurante, datos, mesa, pedido, items, onVolver, onListo }) 
         <button className="btn btn-fantasma" onClick={onVolver} disabled={!!trabajando}>
           ‹ Volver
         </button>
-        <h2 style={{ margin: 0, overflowWrap: 'anywhere' }}>{mesa.llevar ? `Cobrar · ${etiquetaLlevar(pedido)}` : `Cobrar mesa ${mesa.numero}`}</h2>
+        <h2 style={{ margin: 0, overflowWrap: 'anywhere', flex: 1, minWidth: 0 }}>{mesa.llevar ? `Cobrar · ${etiquetaLlevar(pedido)}` : `Cobrar mesa ${mesa.numero}`}</h2>
+        <button className="btn btn-sec" onClick={verPrecuenta} disabled={!!trabajando}>
+          Precuenta
+        </button>
       </div>
 
       <div className="tarjeta" style={{ display: 'grid', gap: 2, padding: 6 }}>
@@ -1535,80 +1686,126 @@ function Cobrar({ restaurante, datos, mesa, pedido, items, onVolver, onListo }) 
             <b className="numero">{formatear(l.total, restaurante)}</b>
           </div>
         ))}
+        {desc && (
+          <div className="entra" style={{ ...s.lineaCobro, color: 'var(--rosa-tinta)' }}>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <b>{desc.etiqueta}</b> <small className="suave">· {desc.motivo}</small>
+            </span>
+            <b className="numero">− {formatear(descuento, restaurante)}</b>
+          </div>
+        )}
       </div>
 
-      <div className="tarjeta" style={{ display: 'grid', gap: 10 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-          <b>Propina</b>
-          <small className="suave">Voluntaria · el cliente decide</small>
-        </div>
-        <div className="propina-opciones" role="group" aria-label="Propina">
-          {[
-            ['0', 'Sin propina'],
-            ['5', '5 %'],
-            ['10', '10 % sugerida'],
-            ['otro', 'Otro monto'],
-          ].map(([id, texto]) => (
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        {desc ? (
+          <>
+            <button className="btn btn-sec" disabled={!!trabajando} onClick={abrirDescuento}>Cambiar descuento</button>
             <button
-              key={id}
-              className="chip"
-              aria-pressed={propinaModo === id}
+              className="btn btn-fantasma"
               disabled={!!trabajando}
               onClick={() => {
-                sentir('toque', 'tic')
-                setPropinaModo(id)
+                sentir('toque')
+                setDesc(null)
               }}
             >
-              {texto}
+              Quitar descuento
             </button>
-          ))}
-        </div>
-        <Desplegable abierto={propinaModo === 'otro'}>
-          <label className="etiqueta" style={{ paddingTop: 2 }}>
-            Monto de la propina ({restaurante.moneda_simbolo})
-            <input
-              className="campo"
-              inputMode={decimales > 0 ? 'decimal' : 'numeric'}
-              placeholder={decimales > 0 ? '0.00' : '0'}
-              value={propinaOtro}
-              disabled={!!trabajando}
-              onChange={(e) => setPropinaOtro(soloPrecio(e.target.value, restaurante))}
-            />
-          </label>
-        </Desplegable>
-        <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--suave)', fontWeight: 700 }}>
-          <span>Cuenta {formatear(total, restaurante)}</span>
-          <span style={{ color: propina > 0 ? 'var(--menta-tinta)' : undefined }}>
-            + Propina {formatear(propina, restaurante)}
-          </span>
-        </div>
+          </>
+        ) : (
+          <button className="btn btn-sec" disabled={!!trabajando} onClick={abrirDescuento}>
+            Descuento o cortesía
+          </button>
+        )}
       </div>
 
+      {!cortesia && (
+        <div className="tarjeta" style={{ display: 'grid', gap: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+            <b>Propina</b>
+            <small className="suave">Voluntaria · el cliente decide</small>
+          </div>
+          <div className="propina-opciones" role="group" aria-label="Propina">
+            {[
+              ['0', 'Sin propina'],
+              ['5', '5 %'],
+              ['10', '10 % sugerida'],
+              ['otro', 'Otro monto'],
+            ].map(([id, texto]) => (
+              <button
+                key={id}
+                className="chip"
+                aria-pressed={propinaModo === id}
+                disabled={!!trabajando}
+                onClick={() => {
+                  sentir('toque', 'tic')
+                  setPropinaModo(id)
+                }}
+              >
+                {texto}
+              </button>
+            ))}
+          </div>
+          <Desplegable abierto={propinaModo === 'otro'}>
+            <label className="etiqueta" style={{ paddingTop: 2 }}>
+              Monto de la propina ({restaurante.moneda_simbolo})
+              <input
+                className="campo"
+                inputMode={decimales > 0 ? 'decimal' : 'numeric'}
+                placeholder={decimales > 0 ? '0.00' : '0'}
+                value={propinaOtro}
+                disabled={!!trabajando}
+                onChange={(e) => setPropinaOtro(soloPrecio(e.target.value, restaurante))}
+              />
+            </label>
+          </Desplegable>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--suave)', fontWeight: 700, flexWrap: 'wrap', gap: 6 }}>
+            <span>Cuenta {formatear(neto, restaurante)}</span>
+            <span style={{ color: propina > 0 ? 'var(--menta-tinta)' : undefined }}>
+              + Propina {formatear(propina, restaurante)}
+            </span>
+          </div>
+        </div>
+      )}
+
       <div style={s.totalCobro}>
-        <small style={{ opacity: 0.8 }}>Total a cobrar</small>
+        <small style={{ opacity: 0.8 }}>{cortesia ? 'Cortesía · nada que cobrar' : 'Total a cobrar'}</small>
         <b style={{ fontSize: 'clamp(30px, 9vw, 40px)', lineHeight: 1.1 }}>
           <NumeroAnimado valor={aPagar} duracion={650} formato={(n) => formatear(n, restaurante)} />
         </b>
       </div>
 
       <Mensaje tipo="error">{error}</Mensaje>
-      {datos.pagos.length === 0 && (
+      {datos.pagos.length === 0 && !cortesia && (
         <p className="nota">No hay métodos de pago activos. El administrador puede agregarlos en “Mesas y ajustes”.</p>
       )}
-      <h3 style={s.titulo}>¿Cómo paga?</h3>
-      <div style={s.pagos}>
-        {datos.pagos.map((m, i) => (
-          <button
-            key={m.id}
-            className="btn btn-principal btn-grande entra"
-            style={{ animationDelay: `${120 + i * 50}ms`, opacity: trabajando === m.id ? 1 : undefined }}
-            disabled={!!trabajando || propinaInvalida}
-            onClick={(e) => (esEfectivo(m.nombre) ? abrirEfectivo(m) : cobrar(m, e))}
-          >
-            {trabajando === m.id ? <span className="puntos">Cobrando</span> : m.nombre}
-          </button>
-        ))}
-      </div>
+
+      {cortesia ? (
+        <button className="btn btn-principal btn-grande" disabled={!!trabajando} onClick={(e) => cobrarCuenta([], e.currentTarget, 'cortesia')}>
+          {trabajando ? <span className="puntos">Registrando</span> : 'Registrar cortesía'}
+        </button>
+      ) : (
+        <>
+          <h3 style={s.titulo}>¿Cómo paga?</h3>
+          <div style={s.pagos}>
+            {datos.pagos.map((m, i) => (
+              <button
+                key={m.id}
+                className="btn btn-principal btn-grande entra"
+                style={{ animationDelay: `${120 + i * 50}ms`, opacity: trabajando === m.id ? 1 : undefined }}
+                disabled={!!trabajando || propinaInvalida}
+                onClick={(e) => (esEfectivo(m.nombre) ? abrirEfectivo(m) : cobrar(m, e))}
+              >
+                {trabajando === m.id ? <span className="puntos">Cobrando</span> : m.nombre}
+              </button>
+            ))}
+          </div>
+          {datos.pagos.length > 0 && aPagar > 0 && (
+            <button className="btn btn-sec" disabled={!!trabajando || propinaInvalida} onClick={abrirDividido}>
+              Dividir o pagar con varios métodos
+            </button>
+          )}
+        </>
+      )}
 
       <Confirmar
         abierto={!!efectivo}
@@ -1659,6 +1856,174 @@ function Cobrar({ restaurante, datos, mesa, pedido, items, onVolver, onListo }) 
               style={{ fontSize: 26, color: falta > 0 ? 'var(--rosa-tinta)' : vuelto != null ? 'var(--menta-tinta)' : 'var(--suave)' }}
             >
               {falta > 0 ? formatear(falta, restaurante) : vuelto != null ? formatear(vuelto, restaurante) : '—'}
+            </b>
+          </div>
+        </div>
+      </Confirmar>
+
+      <Confirmar
+        abierto={descAbierto}
+        titulo="Descuento o cortesía"
+        peligro={false}
+        textoConfirmar={dTrabajando ? 'Verificando…' : 'Aplicar'}
+        trabajando={dTrabajando}
+        error={dError}
+        onCancelar={() => setDescAbierto(false)}
+        onConfirmar={aplicarDescuento}
+      >
+        <div style={{ display: 'grid', gap: 12 }}>
+          <div className="propina-opciones" role="group" aria-label="Tipo de descuento">
+            {[
+              ['5', '5 %'],
+              ['10', '10 %'],
+              ['15', '15 %'],
+              ['20', '20 %'],
+              ['monto', 'Monto'],
+              ['100', 'Cortesía'],
+            ].map(([id, texto]) => (
+              <button key={id} className="chip" aria-pressed={dTipo === id} onClick={() => { sentir('toque', 'tic'); setDTipo(id) }}>
+                {texto}
+              </button>
+            ))}
+          </div>
+          <Desplegable abierto={dTipo === 'monto'}>
+            <label className="etiqueta">
+              Monto a descontar ({restaurante.moneda_simbolo})
+              <input
+                className="campo"
+                inputMode={decimales > 0 ? 'decimal' : 'numeric'}
+                placeholder={decimales > 0 ? '0.00' : '0'}
+                value={dMonto}
+                onChange={(e) => setDMonto(soloPrecio(e.target.value, restaurante))}
+              />
+            </label>
+          </Desplegable>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+            <span className="suave">Se descuenta</span>
+            <b className="numero" style={{ fontSize: 20, color: 'var(--rosa-tinta)' }}>− {formatear(montoDesc ?? 0, restaurante)}</b>
+          </div>
+          <label className="etiqueta">
+            Motivo
+            <input className="campo" maxLength={200} placeholder="Ej.: cumpleaños, error en la cocina…" value={dMotivo} onChange={(e) => setDMotivo(e.target.value)} />
+          </label>
+          {!esAdmin && (
+            <div style={{ display: 'grid', gap: 8, padding: 10, borderRadius: 14, background: 'var(--sup)', border: '1px solid var(--linea)' }}>
+              <small className="suave">Un administrador debe autorizarlo con su PIN.</small>
+              <label className="etiqueta">
+                Autoriza
+                <select className="campo" value={dAdmin} onChange={(e) => setDAdmin(e.target.value)}>
+                  <option value="">Elige…</option>
+                  {admins.map((a) => (
+                    <option key={a.usuario_id} value={a.usuario_id}>{a.nombre}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="etiqueta">
+                PIN del administrador
+                <input
+                  className="campo"
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={4}
+                  value={dPin}
+                  onChange={(e) => setDPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  onKeyDown={(e) => e.key === 'Enter' && !dTrabajando && aplicarDescuento()}
+                />
+              </label>
+            </div>
+          )}
+        </div>
+      </Confirmar>
+
+      <Confirmar
+        abierto={divAbierto}
+        titulo="Dividir el pago"
+        peligro={false}
+        textoConfirmar={trabajando ? 'Cobrando…' : 'Confirmar cobro'}
+        trabajando={!!trabajando}
+        bloqueado={!divisionLista}
+        error={divAbierto ? error : ''}
+        onCancelar={() => setDivAbierto(false)}
+        onConfirmar={confirmarDividido}
+      >
+        <div style={{ display: 'grid', gap: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+            <span className="suave">Total a cobrar</span>
+            <b className="numero" style={{ fontSize: 22 }}>{formatear(aPagar, restaurante)}</b>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+            <label className="etiqueta" style={{ flex: 1 }}>
+              Repartir en partes iguales entre
+              <input
+                className="campo"
+                inputMode="numeric"
+                value={personas}
+                disabled={!!trabajando}
+                onChange={(e) => setPersonas(e.target.value.replace(/\D/g, '').slice(0, 2))}
+              />
+            </label>
+            <button className="btn btn-sec" disabled={!!trabajando} onClick={() => repartir(personas)}>
+              Repartir
+            </button>
+          </div>
+          {lineasPago.map((l, i) => (
+            <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <select className="campo" style={{ flex: 1.7, minWidth: 0 }} value={l.metodo} disabled={!!trabajando} onChange={(e) => cambiarLinea(i, { metodo: e.target.value })}>
+                {datos.pagos.map((m) => (
+                  <option key={m.id} value={m.id}>{m.nombre}</option>
+                ))}
+              </select>
+              <input
+                className="campo"
+                style={{ flex: 1, minWidth: 0 }}
+                inputMode={decimales > 0 ? 'decimal' : 'numeric'}
+                aria-label={`Monto del pago ${i + 1}`}
+                value={l.monto}
+                disabled={!!trabajando}
+                onChange={(e) => cambiarLinea(i, { monto: soloPrecio(e.target.value, restaurante) })}
+              />
+              <button
+                className="btn btn-fantasma"
+                aria-label={`Poner lo que falta en el pago ${i + 1}`}
+                title="Poner lo que falta"
+                disabled={!!trabajando || pendiente === 0}
+                onClick={() => cambiarLinea(i, { monto: String(redondear(Math.max(0, (montoLinea(l) ?? 0) + pendiente))) })}
+              >
+                Resto
+              </button>
+              {lineasPago.length > 1 && (
+                <button className="btn btn-fantasma" aria-label={`Quitar el pago ${i + 1}`} disabled={!!trabajando} onClick={() => setLineasPago((ls) => ls.filter((_, j) => j !== i))}>
+                  ✕
+                </button>
+              )}
+            </div>
+          ))}
+          {lineasPago.length < 12 && (
+            <button
+              className="btn btn-sec"
+              disabled={!!trabajando}
+              onClick={() => setLineasPago((ls) => [...ls, { metodo: metodoInicial, monto: pendiente > 0 ? String(pendiente) : '' }])}
+            >
+              + Agregar pago
+            </button>
+          )}
+          <div
+            aria-live="polite"
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'baseline',
+              gap: 8,
+              padding: '12px 14px',
+              borderRadius: 14,
+              background: pendiente === 0 ? 'var(--menta)' : 'var(--sup)',
+              border: '1px solid var(--linea)',
+            }}
+          >
+            <b>{pendiente > 0 ? 'Falta' : pendiente < 0 ? 'Sobra' : 'Cuadra'}</b>
+            <b className="numero" style={{ fontSize: 24, color: pendiente === 0 ? 'var(--menta-tinta)' : 'var(--rosa-tinta)' }}>
+              {formatear(Math.abs(pendiente), restaurante)}
             </b>
           </div>
         </div>

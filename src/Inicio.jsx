@@ -70,7 +70,7 @@ export default function Inicio({ restaurante, conPedidos, ir }) {
         traerTodo(() =>
           supabase
             .from('pedidos')
-            .select('id, dia, total, propina, estado, cerrado_en, llevar_numero, metodos_pago(nombre), items_pedido(nombre, cantidad)')
+            .select('id, dia, total, propina, estado, cerrado_en, llevar_numero, metodos_pago(nombre), pagos_pedido(monto_venta, metodos_pago(nombre)), items_pedido(nombre, cantidad)')
             .eq('restaurante_id', restaurante.id)
             .in('dia', dias)
             .order('id')
@@ -115,8 +115,15 @@ export default function Inicio({ restaurante, conPedidos, ir }) {
     const pagos = new Map()
     delHoy.forEach((p) => {
       p.items_pedido.forEach((i) => platos.set(i.nombre, (platos.get(i.nombre) ?? 0) + i.cantidad))
-      const m = p.metodos_pago?.nombre ?? 'Sin método'
-      pagos.set(m, (pagos.get(m) ?? 0) + Number(p.total))
+      if (p.pagos_pedido?.length) {
+        p.pagos_pedido.forEach((l) => {
+          const m = l.metodos_pago?.nombre ?? 'Sin método'
+          pagos.set(m, (pagos.get(m) ?? 0) + Number(l.monto_venta))
+        })
+      } else if (Number(p.total) > 0) {
+        const m = p.metodos_pago?.nombre ?? 'Sin método'
+        pagos.set(m, (pagos.get(m) ?? 0) + Number(p.total))
+      }
     })
 
     const mesasVisibles = datos.mesas.filter((m) => !m.unida_a).length

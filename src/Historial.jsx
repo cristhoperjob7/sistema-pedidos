@@ -36,7 +36,7 @@ export default function Historial({ restaurante }) {
     let q = supabase
       .from('pedidos')
       .select(
-        'id, numero, total, propina, estado, mesero_id, mesa_numero, llevar_numero, cliente, abierto_en, cerrado_en, dia, metodos_pago(nombre), items_pedido(nombre, cantidad, precio_unitario), anulaciones(nombre, cantidad, monto)'
+        'id, numero, total, propina, descuento, descuento_motivo, estado, mesero_id, mesa_numero, llevar_numero, cliente, abierto_en, cerrado_en, dia, metodos_pago(nombre), pagos_pedido(monto_venta, monto_propina, metodos_pago(nombre)), items_pedido(nombre, cantidad, precio_unitario), anulaciones(nombre, cantidad, monto)'
       )
       .eq('restaurante_id', restaurante.id)
       .in('estado', filtro === 'todos' ? ['pagado', 'anulado'] : [filtro])
@@ -59,6 +59,12 @@ export default function Historial({ restaurante }) {
 
   const hora = (f) => (f ? new Date(f).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: restaurante.zona_horaria }) : '')
   const fecha = (f) => new Date(f).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', timeZone: restaurante.zona_horaria })
+  // "Efectivo", "Efectivo + Tarjeta", "Mixto" (3 o más) o "Cortesía" si no hubo pago.
+  const formaDePago = (p) => {
+    const nombres = [...new Set((p.pagos_pedido ?? []).map((l) => l.metodos_pago?.nombre).filter(Boolean))]
+    if (nombres.length === 0) return Number(p.descuento) > 0 && Number(p.total) === 0 ? 'Cortesía' : p.metodos_pago?.nombre ?? ''
+    return nombres.length > 2 ? 'Mixto' : nombres.join(' + ')
+  }
   const titulo = (p) =>
     p.llevar_numero != null ? `Llevar ${p.llevar_numero}${p.cliente ? ` · ${p.cliente}` : ''}` : `Mesa ${p.mesa_numero ?? '?'}`
 
@@ -136,7 +142,7 @@ export default function Historial({ restaurante }) {
                 <b>{titulo(p)} <small className="suave" style={{ fontWeight: 600 }}>· #{p.numero}</small></b>
                 <small className="suave">
                   {fecha(p.abierto_en)} · {hora(p.cerrado_en ?? p.abierto_en)}
-                  {anulado ? ' · Anulada' : p.metodos_pago?.nombre ? ` · ${p.metodos_pago.nombre}` : ''}
+                  {anulado ? ' · Anulada' : formaDePago(p) ? ` · ${formaDePago(p)}` : ''}
                 </small>
               </span>
               <b style={{ fontSize: 17, textDecoration: anulado ? 'line-through' : 'none' }}>{$(p.total)}</b>
@@ -151,6 +157,19 @@ export default function Historial({ restaurante }) {
                   </div>
                 ))}
                 {p.items_pedido.length === 0 && <small className="suave">Sin productos.</small>}
+                {Number(p.descuento) > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--rosa-tinta)', fontWeight: 700 }}>
+                    <span>{Number(p.total) === 0 ? 'Cortesía' : 'Descuento'}{p.descuento_motivo ? ` · ${p.descuento_motivo}` : ''}</span>
+                    <span>− {$(p.descuento)}</span>
+                  </div>
+                )}
+                {p.pagos_pedido?.length > 1 &&
+                  p.pagos_pedido.map((l, k) => (
+                    <div key={`pago${k}`} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <small className="suave">Pagó con {l.metodos_pago?.nombre ?? '—'}</small>
+                      <small className="suave">{$(Number(l.monto_venta) + Number(l.monto_propina))}</small>
+                    </div>
+                  ))}
                 {Number(p.propina) > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--menta-tinta)', fontWeight: 700 }}>
                     <span>Propina</span><span>{$(p.propina)}</span>

@@ -20,15 +20,17 @@ export function abrirPDFCaja({ restaurante, dia, res, turnos = [], cierre }) {
   const $ = (v) => formatear(v, restaurante)
   const zona = restaurante.zona_horaria || 'America/Santiago'
   const hora = (iso) => new Date(iso).toLocaleTimeString('es-CL', { timeStyle: 'short', timeZone: zona })
+  const origen = typeof window !== 'undefined' && window.location ? window.location.origin + window.location.pathname : '/'
   const marca = esHex(restaurante.color_marca) ? restaurante.color_marca : '#2f6fe0'
 
   const metodos = res.metodos ?? []
   const ventas = metodos.reduce((n, m) => n + Number(m.ventas), 0)
   const propinas = metodos.reduce((n, m) => n + Number(m.propinas), 0)
-  const cuentas = metodos.reduce((n, m) => n + Number(m.pedidos), 0)
+  const cuentas = res.pedidos != null ? Number(res.pedidos) : metodos.reduce((n, m) => n + Number(m.pedidos), 0)
   const ticket = cuentas ? ventas / cuentas : 0
   const efectivoCobrado = metodos.filter((m) => esEfectivo(m.nombre)).reduce((n, m) => n + Number(m.ventas) + Number(m.propinas), 0)
   const anulado = Number(res.anulado ?? 0)
+  const descuentos = Number(res.descuentos ?? 0)
   const abiertas = Number(res.abiertos ?? 0)
 
   const fecha = mayus(new Date(dia + 'T12:00:00').toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))
@@ -46,6 +48,7 @@ export function abrirPDFCaja({ restaurante, dia, res, turnos = [], cierre }) {
   if (!cerrada) alertas.push(['aviso', 'La caja de este día todavía no está cerrada. Las cifras pueden cambiar.'])
   if (abiertas > 0) alertas.push(['mal', `Hay ${abiertas} cuenta${abiertas === 1 ? '' : 's'} abierta${abiertas === 1 ? '' : 's'} sin cobrar.`])
   if (cerrada && dif !== null && !cuadra) alertas.push(['mal', `Diferencia en el efectivo del día: ${textoDif.toLowerCase()}.`])
+  if (descuentos > 0) alertas.push(['info', `Descuentos y cortesías del día: ${$(descuentos)} en ${Number(res.n_descuentos ?? 0)} cuenta${Number(res.n_descuentos) === 1 ? '' : 's'}.`])
   if (anulado > 0) alertas.push(['aviso', `Se anuló ${$(anulado)} en productos o cuentas durante el día.`])
   const sinCerrar = turnos.filter((t) => t.cerrado_en == null)
   if (sinCerrar.length) alertas.push(['mal', `Cajas de meseras sin cerrar: ${sinCerrar.map((t) => esc(t.nombre)).join(', ')}.`])
@@ -85,6 +88,9 @@ export function abrirPDFCaja({ restaurante, dia, res, turnos = [], cierre }) {
   * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact }
   body { margin: 0; font-family: Inter, "Helvetica Neue", Arial, sans-serif; color: #14181f; font-size: 10.5pt; line-height: 1.3 }
   .barra-pantalla { position: sticky; top: 0; display: flex; gap: 12px; align-items: center; justify-content: center; padding: 10px; background: #14181f; color: #fff; font-size: 14px }
+  .barra-pantalla .volver { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.5) }
+  .barra-pantalla .ayuda { opacity: .7; font-size: 12px }
+  .barra-pantalla { flex-wrap: wrap }
   .barra-pantalla button { border: 0; border-radius: 8px; padding: 8px 16px; font-weight: 700; font-size: 14px; background: #fff; cursor: pointer }
   @media print { .barra-pantalla { display: none } }
   .hoja { max-width: 188mm; margin: 0 auto; padding: 4mm 0 }
@@ -128,7 +134,7 @@ export function abrirPDFCaja({ restaurante, dia, res, turnos = [], cierre }) {
   footer { margin-top: 14px; font-size: 8.5pt; color: #8a94a6; display: flex; justify-content: space-between }
   section { break-inside: avoid }
 </style></head><body>
-<div class="barra-pantalla"><span>Vista previa del cierre de caja</span><button onclick="window.print()">Guardar como PDF / Imprimir</button><span style="opacity:.7">Elige “Guardar como PDF” como destino</span></div>
+<div class="barra-pantalla"><button class="volver" onclick="(function(){ if (window.opener) { window.close(); setTimeout(function(){ location.href = '${esc(origen)}' }, 300) } else { location.href = '${esc(origen)}' } })()">&larr; Volver al sistema</button><button onclick="window.print()">Guardar como PDF / Imprimir</button><span class="ayuda">Elige “Guardar como PDF” como destino</span></div>
 <div class="hoja">
   <header>
     <div>

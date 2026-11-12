@@ -71,7 +71,8 @@ export default function Caja({ restaurante }) {
   const cierre = res.cierre
   const ventas = metodos.reduce((n, m) => n + Number(m.ventas), 0)
   const propinas = metodos.reduce((n, m) => n + Number(m.propinas), 0)
-  const pedidos = metodos.reduce((n, m) => n + Number(m.pedidos), 0)
+  // Con pagos divididos una cuenta aparece en varios métodos: el total de cuentas viene aparte.
+  const pedidos = res.pedidos != null ? Number(res.pedidos) : metodos.reduce((n, m) => n + Number(m.pedidos), 0)
   const efVentas = metodos.filter((m) => esEfectivo(m.nombre)).reduce((n, m) => n + Number(m.ventas) + Number(m.propinas), 0)
   const fondoTurnos = turnos.reduce((n, x) => n + Number(x.fondo_inicial), 0)
   const hayTurnoAbierto = turnos.some((x) => x.cerrado_en == null)
@@ -184,6 +185,7 @@ export default function Caja({ restaurante }) {
         {tarjeta('Propinas', $(propinas), 'aparte de lo vendido')}
         {tarjeta('En el salón', $(res.ventas_salon))}
         {tarjeta('Para llevar', $(res.ventas_llevar))}
+        {Number(res.descuentos) > 0 && tarjeta('Descuentos', $(res.descuentos), `${res.n_descuentos} cuenta${Number(res.n_descuentos) === 1 ? '' : 's'}`)}
         {Number(res.anulado) > 0 && tarjeta('Anulado', $(res.anulado))}
       </div>
 

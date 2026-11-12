@@ -42,7 +42,7 @@ export default function Reporte({ restaurante }) {
     supabase
       .from('pedidos')
       .select(
-        'id, numero, total, propina, estado, mesero_id, mesa_numero, metodos_pago(nombre), items_pedido(nombre, cantidad, tipo)'
+        'id, numero, total, propina, estado, mesero_id, mesa_numero, metodos_pago(nombre), pagos_pedido(monto_venta, metodos_pago(nombre)), items_pedido(nombre, cantidad, tipo)'
       )
       .eq('restaurante_id', restaurante.id)
       .eq('dia', dia)
@@ -82,8 +82,16 @@ export default function Reporte({ restaurante }) {
         const m = porTipo[tipo] ?? porTipo.otro
         m.set(i.nombre, (m.get(i.nombre) ?? 0) + i.cantidad)
       })
-      const metodo = p.metodos_pago?.nombre ?? 'Sin método'
-      pagos.set(metodo, (pagos.get(metodo) ?? 0) + Number(p.total))
+      // Cada línea de pago suma a su método (un pago dividido reparte la venta entre varios).
+      if (p.pagos_pedido?.length) {
+        p.pagos_pedido.forEach((l) => {
+          const metodo = l.metodos_pago?.nombre ?? 'Sin método'
+          pagos.set(metodo, (pagos.get(metodo) ?? 0) + Number(l.monto_venta))
+        })
+      } else if (Number(p.total) > 0) {
+        const metodo = p.metodos_pago?.nombre ?? 'Sin método'
+        pagos.set(metodo, (pagos.get(metodo) ?? 0) + Number(p.total))
+      }
       const m = meseras.get(nombre(p.mesero_id)) ?? { cuentas: 0, total: 0 }
       m.cuentas += 1
       m.total += Number(p.total)
