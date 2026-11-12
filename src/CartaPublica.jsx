@@ -8,9 +8,12 @@ import { fotoOk } from './imagenes'
 import Icono from './iconos'
 import { ordenarNombre } from './orden'
 
-// Dirección de la carta: tu-sitio/#/carta/<codigo-del-local>/<codigo-de-la-mesa>
+// Dirección de la carta (la que llevan los QR): tu-sitio/c/<codigo-del-local>/<codigo-de-la-mesa>
+// Las direcciones antiguas (tu-sitio/#/carta/<local>/<mesa>) siguen funcionando, así que ningún QR ya impreso se rompe.
 export function rutaCarta() {
-  const m = /^#\/carta\/([^/?#]+)\/([^/?#]+)/.exec(window.location.hash || '')
+  const m =
+    /^\/c\/([^/?#]+)\/([^/?#]+)\/?$/.exec(window.location.pathname || '') ||
+    /^#\/carta\/([^/?#]+)\/([^/?#]+)/.exec(window.location.hash || '')
   return m ? { slug: decodeURIComponent(m[1]), token: decodeURIComponent(m[2]) } : null
 }
 

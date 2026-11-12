@@ -8,9 +8,9 @@ import PlatosCarta from './PlatosCarta'
 import { avisar, sentir } from './feedback'
 import { esHex } from './paletas'
 
-// Dirección que lleva cada QR. Usa la misma página donde está instalada la app.
-const urlCarta = (slug, token) =>
-  `${window.location.origin}${window.location.pathname}#/carta/${encodeURIComponent(slug)}/${token}`
+// Dirección que lleva cada QR: dominio + /c/<local>/<mesa>. Es corta y estable: si algún día cambia cómo funciona
+// la app por dentro, los QR impresos siguen sirviendo (solo importa que el dominio no cambie).
+const urlCarta = (slug, token) => `${window.location.origin}/c/${encodeURIComponent(slug)}/${token}`
 
 const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
 
@@ -136,6 +136,8 @@ function SeccionQR({ restaurante }) {
   * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact }
   body { margin: 0; font-family: "Helvetica Neue", Arial, sans-serif; background: #e9ebef }
   .barra { position: sticky; top: 0; display: flex; gap: 12px; align-items: center; justify-content: center; padding: 10px; background: #14181f; color: #fff; font-size: 14px; z-index: 5 }
+  .barra { flex-wrap: wrap }
+  .barra .volver { background: transparent; border: 1px solid rgba(255,255,255,.5) }
   .barra button { font: inherit; font-weight: 700; padding: 8px 16px; border: 0; border-radius: 8px; background: ${marca}; color: #fff; cursor: pointer }
   .hoja { width: 194mm; margin: 8mm auto; display: grid; grid-template-columns: 95mm 95mm; grid-auto-rows: 135mm; gap: 4mm; page-break-after: always; break-after: page }
   .hoja:last-child { page-break-after: auto; break-after: auto }
@@ -155,7 +157,7 @@ function SeccionQR({ restaurante }) {
   .ayuda { font-size: 8.5pt; color: ${suave}; margin-top: 1.2mm }
   @media print { body { background: none } .barra { display: none } .hoja { margin: 0 auto } }
 </style></head><body>
-<div class="barra"><span>Vista previa · ${tarjetas.length} tarjeta${tarjetas.length === 1 ? '' : 's'} de 9,5 × 13,5 cm (4 por hoja A4)</span><button onclick="window.print()">Imprimir</button><span style="opacity:.7">Activa “Gráficos de fondo” si se ven sin color</span></div>
+<div class="barra"><button class="volver" onclick="(function(){ if (window.opener) { window.close(); setTimeout(function(){ location.href = '${esc(window.location.origin + window.location.pathname)}' }, 300) } else { location.href = '${esc(window.location.origin + window.location.pathname)}' } })()">&larr; Volver al sistema</button><span>Vista previa · ${tarjetas.length} tarjeta${tarjetas.length === 1 ? '' : 's'} de 9,5 × 13,5 cm (4 por hoja A4)</span><button onclick="window.print()">Imprimir</button><span style="opacity:.7">Activa “Gráficos de fondo” si se ven sin color</span></div>
 ${hojas
   .map(
     (h) =>

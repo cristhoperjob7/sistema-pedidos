@@ -17,6 +17,8 @@ const etiquetaPedido = (p, mesas) =>
   esLlevar(p) ? etiquetaLlevar(p) : `Mesa ${mesas.find((m) => m.id === p?.mesa_id)?.numero ?? '?'}`
 // "Mesa" ficticia para armar un pedido para llevar con la misma pantalla de las mesas.
 const MESA_LLEVAR = { id: null, numero: null, nombre: null, llevar: true }
+// Método de pago "Efectivo" (misma regla que usa el cierre de caja): pide con cuánto paga el cliente y calcula el vuelto.
+const esEfectivo = (nombre) => /(efectivo|cash)/i.test(nombre ?? '')
 
 // ¿La pantalla es lo bastante ancha (tablet horizontal o computador) para mostrar mesas y cuenta lado a lado?
 function useAnchoGrande(minimo) {
@@ -1436,6 +1438,9 @@ function Cobrar({ restaurante, datos, mesa, pedido, items, onVolver, onListo }) 
   const [trabajando, setTrabajando] = useState(null) // id del método que se está cobrando
   const [propinaModo, setPropinaModo] = useState('10') // '0' | '5' | '10' | 'otro'
   const [propinaOtro, setPropinaOtro] = useState('')
+  const [efectivo, setEfectivo] = useState(null) // método "Efectivo" mientras se pide el monto recibido
+  const [recibido, setRecibido] = useState('')
+  const entradaRecibido = useRef(null)
 
   const lineas = useMemo(() => {
     const g = new Map()
@@ -1456,6 +1461,26 @@ function Cobrar({ restaurante, datos, mesa, pedido, items, onVolver, onListo }) 
   const propina = propinaModo === 'otro' ? (otro ?? 0) : redondear((total * Number(propinaModo)) / 100)
   const propinaInvalida = propinaModo === 'otro' && otro === null
   const aPagar = total + propina
+
+  // Efectivo: con cuánto paga el cliente y cuánto hay que devolver.
+  const recibidoNum = leerPrecio(recibido, restaurante)
+  const falta = recibidoNum != null && recibidoNum < aPagar ? redondear(aPagar - recibidoNum) : 0
+  const vuelto = recibidoNum != null && recibidoNum >= aPagar ? redondear(recibidoNum - aPagar) : null
+  const efectivoListo = recibidoNum != null && recibidoNum >= aPagar
+
+  useEffect(() => {
+    if (!efectivo) return
+    const t = setTimeout(() => entradaRecibido.current?.focus(), 80)
+    return () => clearTimeout(t)
+  }, [efectivo])
+
+  function abrirEfectivo(metodo) {
+    if (propinaInvalida) return setError('La propina no es válida.')
+    sentir('toque')
+    setError('')
+    setRecibido('')
+    setEfectivo(metodo)
+  }
 
   async function cobrar(metodo, e) {
     const boton = e.currentTarget
@@ -1578,12 +1603,66 @@ function Cobrar({ restaurante, datos, mesa, pedido, items, onVolver, onListo }) 
             className="btn btn-principal btn-grande entra"
             style={{ animationDelay: `${120 + i * 50}ms`, opacity: trabajando === m.id ? 1 : undefined }}
             disabled={!!trabajando || propinaInvalida}
-            onClick={(e) => cobrar(m, e)}
+            onClick={(e) => (esEfectivo(m.nombre) ? abrirEfectivo(m) : cobrar(m, e))}
           >
             {trabajando === m.id ? <span className="puntos">Cobrando</span> : m.nombre}
           </button>
         ))}
       </div>
+
+      <Confirmar
+        abierto={!!efectivo}
+        titulo="Cobro en efectivo"
+        peligro={false}
+        textoConfirmar={trabajando ? 'Cobrando…' : 'Confirmar cobro'}
+        trabajando={!!trabajando}
+        bloqueado={!efectivoListo}
+        error={efectivo ? error : ''}
+        onCancelar={() => setEfectivo(null)}
+        onConfirmar={(e) => efectivoListo && cobrar(efectivo, e)}
+      >
+        <div style={{ display: 'grid', gap: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+            <span className="suave">Total a cobrar</span>
+            <b className="numero" style={{ fontSize: 22 }}>{formatear(aPagar, restaurante)}</b>
+          </div>
+          <label className="etiqueta">
+            Monto con el que paga ({restaurante.moneda_simbolo})
+            <input
+              ref={entradaRecibido}
+              className="campo"
+              inputMode={decimales > 0 ? 'decimal' : 'numeric'}
+              placeholder={decimales > 0 ? '0.00' : '0'}
+              value={recibido}
+              disabled={!!trabajando}
+              onChange={(e) => setRecibido(soloPrecio(e.target.value, restaurante))}
+              onKeyDown={(e) => e.key === 'Enter' && efectivoListo && !trabajando && cobrar(efectivo, e)}
+              style={{ fontSize: 22, fontWeight: 800 }}
+            />
+          </label>
+          <div
+            aria-live="polite"
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'baseline',
+              gap: 8,
+              padding: '12px 14px',
+              borderRadius: 14,
+              background: vuelto != null ? 'var(--menta)' : 'var(--sup)',
+              border: '1px solid var(--linea)',
+            }}
+          >
+            <b>{falta > 0 ? 'Falta' : 'Vuelto'}</b>
+            <b
+              className="numero"
+              style={{ fontSize: 26, color: falta > 0 ? 'var(--rosa-tinta)' : vuelto != null ? 'var(--menta-tinta)' : 'var(--suave)' }}
+            >
+              {falta > 0 ? formatear(falta, restaurante) : vuelto != null ? formatear(vuelto, restaurante) : '—'}
+            </b>
+          </div>
+        </div>
+      </Confirmar>
     </div>
   )
 }
