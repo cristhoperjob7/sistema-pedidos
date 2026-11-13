@@ -33,6 +33,19 @@ const CAMPOS_TRANSF = [
 const lineasTransf = (m) => CAMPOS_TRANSF.map(([k, t]) => [t, String(m?.datos?.[k] ?? '').trim()]).filter(([, v]) => v)
 
 // ¿La pantalla es lo bastante ancha (tablet horizontal o computador) para mostrar mesas y cuenta lado a lado?
+function normalizar(t) {
+  return String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+}
+
+// Ícono del cuadrado de cada categoría, según su tipo o su nombre.
+function iconoCategoria(c) {
+  const n = normalizar(c.nombre)
+  if (c.tipo === 'bebida' || /bebida|jugo|cerveza|trago|vino|gaseosa|limonada|cafe|te\b/.test(n)) return 'bebida'
+  if (c.tipo === 'postre' || /postre|dulce|helado|torta/.test(n)) return 'postre'
+  if (/para llevar|envase|empaque/.test(n)) return 'bolsa'
+  return 'cubiertos'
+}
+
 function useAnchoGrande(minimo) {
   const consulta = `(min-width: ${minimo}px)`
   const [ancho, setAncho] = useState(() => typeof window !== 'undefined' && window.matchMedia(consulta).matches)
@@ -637,7 +650,9 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
       : `Mesa ${mesa.numero}`
   const [pidiendoNombre, setPidiendoNombre] = useState(false) // pedido para llevar nuevo: se pregunta el nombre antes de enviar
   const [nombreCliente, setNombreCliente] = useState('')
-  const [catId, setCatId] = useState(datos.cats[0]?.id ?? null)
+  const [catId, setCatId] = useState(null) // null = se ven los cuadrados de categorías
+  const [buscando, setBuscando] = useState(false) // ventana de búsqueda (lupa)
+  const [consulta, setConsulta] = useState('')
   const [pend, setPend] = useState({}) // productos elegidos que todavía no se confirman: { [productoId]: { n, nota } }
   const [editandoNota, setEditandoNota] = useState(null) // id del producto cuya nota se está escribiendo
   const [conf, setConf] = useState(null) // clave de la línea que se está por anular
@@ -668,6 +683,18 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
     }
   }, [abierta])
 
+  useEffect(() => {
+    if (!buscando) return
+    const previo = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const alTeclear = (e) => e.key === 'Escape' && setBuscando(false)
+    window.addEventListener('keydown', alTeclear)
+    return () => {
+      document.body.style.overflow = previo
+      window.removeEventListener('keydown', alTeclear)
+    }
+  }, [buscando])
+
   const catsPorId = useMemo(() => new Map(datos.cats.map((c) => [c.id, c])), [datos.cats])
   const prodsPorId = useMemo(() => new Map(datos.prods.map((p) => [p.id, p])), [datos.prods])
   const catActual = catsPorId.get(catId)
@@ -676,6 +703,22 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
   const prodsDeCat = datos.prods.filter((p) => p.categoria_id === catId)
   const prodsCat = prodsDeCat.filter((p) => !agotado(p) || pend[p.id])
   const soloAgotados = prodsDeCat.length > 0 && prodsCat.length === 0
+  // Cuántos productos elegidos (sin enviar) hay por categoría: se muestra en el cuadrado.
+  const pendPorCat = useMemo(() => {
+    const m = new Map()
+    for (const [id, v] of Object.entries(pend)) {
+      const p = prodsPorId.get(id)
+      if (p && v.n > 0) m.set(p.categoria_id, (m.get(p.categoria_id) ?? 0) + v.n)
+    }
+    return m
+  }, [pend, prodsPorId])
+  const resultados = useMemo(() => {
+    const q = normalizar(consulta)
+    if (!q) return []
+    return datos.prods
+      .filter((p) => normalizar(p.nombre).includes(q) && (!estaAgotado(p, hoy) || pend[p.id]))
+      .slice(0, 40)
+  }, [consulta, datos.prods, hoy, pend])
 
   // Lo confirmado, juntando los productos iguales en una sola línea.
   const grupos = useMemo(() => {
@@ -703,6 +746,54 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
   const totalConf = items.reduce((t, i) => t + i.cantidad * Number(i.precio_unitario), 0)
   const totalPend = lineasPend.reduce((t, x) => t + x.n * Number(x.prod.precio), 0)
   const unidades = items.reduce((n, i) => n + i.cantidad, 0) + lineasPend.reduce((n, x) => n + x.n, 0)
+
+  // Una fila de producto (la misma en la lista de la categoría y en los resultados de la búsqueda).
+  function filaProducto(p, i, categoria = null) {
+    const q = pend[p.id]?.n ?? 0
+    const sinStock = agotado(p) // solo se ve si ya estaba elegido: hay que quitarlo
+    return (
+      <div
+        key={p.id}
+        className="entra"
+        style={{
+          ...s.producto,
+          ...(sinStock ? s.productoAgotado : q > 0 ? s.productoElegido : null),
+          animationDelay: `${Math.min(i, 10) * 25}ms`,
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <b style={{ display: 'block' }}>{p.nombre}</b>
+          {sinStock ? (
+            <span className="infla" style={s.etiquetaAgotado}>
+              <Icono n="prohibido" tam={15} className="it" /> Se agotó · quítalo del pedido
+            </span>
+          ) : (
+            <small className="suave">
+              {formatear(p.precio, restaurante)}
+              {categoria ? ` · ${categoria}` : ''}
+            </small>
+          )}
+        </div>
+        <div style={s.cantidad}>
+          {q > 0 && (
+            <>
+              <button className="btn-redondo btn-suave infla" aria-label={`Quitar ${p.nombre}`} onClick={() => cambiar(p, -1)}>
+                −
+              </button>
+              <b key={q} className="contador-pop numero" style={{ minWidth: 22, textAlign: 'center', fontSize: 18 }}>
+                {q}
+              </b>
+            </>
+          )}
+          {!sinStock && (
+            <button className="btn-redondo btn-principal" aria-label={`Agregar ${p.nombre}`} onClick={() => cambiar(p, 1)}>
+              +
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   function cambiar(prod, d) {
     sentir('toque', d > 0 ? 'pop' : 'popBajo')
@@ -914,22 +1005,6 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
         </Desplegable>
 
 
-        <div className="chips">
-          {datos.cats.map((c) => (
-            <button
-              key={c.id}
-              className="chip"
-              aria-pressed={c.id === catId}
-              onClick={() => {
-                if (c.id !== catId) sentir('toque')
-                setCatId(c.id)
-              }}
-            >
-              {c.nombre}
-            </button>
-          ))}
-        </div>
-
         {datos.cats.length === 0 && (
           <div className="vacio">
             <span className="vacio-icono"><Icono n="lista" tam={34} ancho={1.5} /></span>
@@ -937,56 +1012,59 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
             <span>El administrador puede cargarlo en la pestaña “Menú”.</span>
           </div>
         )}
-        {catActual && !catActual.va_a_cocina && (
-          <p className="nota aparece">Estos productos no pasan por cocina. Toca AÑADIR para sumarlos al pedido.</p>
+
+        {datos.cats.length > 0 && (
+          <div style={s.cabCarta}>
+            {catActual ? (
+              <button className="btn btn-chico btn-sec" aria-label="Volver a las categorías" onClick={() => { sentir('toque'); setCatId(null) }}>
+                <Icono n="atras" tam={16} className="it" /> Categorías
+              </button>
+            ) : (
+              <b style={{ flex: 1, fontSize: 17 }}>Elige una categoría</b>
+            )}
+            {catActual && <b style={{ flex: 1, minWidth: 0, fontSize: 17, overflowWrap: 'anywhere' }}>{catActual.nombre}</b>}
+            <button
+              className="btn btn-chico btn-principal"
+              aria-label="Buscar un producto"
+              onClick={() => { sentir('toque'); setConsulta(''); setBuscando(true) }}
+            >
+              <Icono n="buscar" tam={18} />
+            </button>
+          </div>
         )}
 
-        <div key={catId} style={s.lista}>
-          {prodsCat.map((p, i) => {
-            const q = pend[p.id]?.n ?? 0
-            const sinStock = agotado(p) // solo se ve si ya estaba elegido: hay que quitarlo
-            return (
-              <div
-                key={p.id}
-                className="entra"
-                style={{
-                  ...s.producto,
-                  ...(sinStock ? s.productoAgotado : q > 0 ? s.productoElegido : null),
-                  animationDelay: `${Math.min(i, 10) * 25}ms`,
-                }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <b style={{ display: 'block' }}>{p.nombre}</b>
-                  {sinStock ? (
-                    <span className="infla" style={s.etiquetaAgotado}>
-                      <Icono n="prohibido" tam={15} className="it" /> Se agotó · quítalo del pedido
-                    </span>
-                  ) : (
-                    <small className="suave">{formatear(p.precio, restaurante)}</small>
-                  )}
-                </div>
-                <div style={s.cantidad}>
-                  {q > 0 && (
-                    <>
-                      <button className="btn-redondo btn-suave infla" aria-label={`Quitar ${p.nombre}`} onClick={() => cambiar(p, -1)}>
-                        −
-                      </button>
-                      <b key={q} className="contador-pop numero" style={{ minWidth: 22, textAlign: 'center', fontSize: 18 }}>
-                        {q}
-                      </b>
-                    </>
-                  )}
-                  {!sinStock && (
-                    <button className="btn-redondo btn-principal" aria-label={`Agregar ${p.nombre}`} onClick={() => cambiar(p, 1)}>
-                      +
-                    </button>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-        {datos.cats.length > 0 && prodsCat.length === 0 && (
+        {datos.cats.length > 0 && !catActual && (
+          <div className="cat-grilla aparece">
+            {datos.cats.map((c, i) => {
+              const nPend = pendPorCat.get(c.id) ?? 0
+              const nProd = datos.prods.filter((p) => p.categoria_id === c.id && (!agotado(p) || pend[p.id])).length
+              return (
+                <button
+                  key={c.id}
+                  className="cat-cuadro entra"
+                  style={{ animationDelay: `${Math.min(i, 10) * 25}ms` }}
+                  onClick={() => { sentir('toque'); setCatId(c.id) }}
+                >
+                  {nPend > 0 && <em key={nPend} className="cat-cuadro-n contador-pop">{nPend}</em>}
+                  <span className="cat-cuadro-ic"><Icono n={iconoCategoria(c)} tam={30} ancho={1.7} /></span>
+                  <b>{c.nombre}</b>
+                  <small>{nProd} {nProd === 1 ? 'producto' : 'productos'}</small>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {catActual && !catActual.va_a_cocina && (
+          <p className="nota aparece">Estos productos no pasan por cocina. Toca + para sumarlos al pedido.</p>
+        )}
+
+        {catActual && (
+          <div key={catId} style={s.lista}>
+            {prodsCat.map((p, i) => filaProducto(p, i))}
+          </div>
+        )}
+        {catActual && prodsCat.length === 0 && (
           <p className="nota aparece">
             {soloAgotados ? <><Icono n="prohibido" tam={15} className="it" /> Todo lo de esta categoría está agotado por hoy.</> : 'Esta categoría no tiene productos activos.'}
           </p>
@@ -1025,6 +1103,41 @@ function Mesa({ restaurante, datos, rol, mesa, miembros = [], pedido, items, lis
           </span>
         </button>
       </div>
+
+      {buscando &&
+        createPortal(
+          <div className="buscar-velo funde" onClick={() => setBuscando(false)}>
+            <div className="buscar-caja sube" role="dialog" aria-modal="true" aria-label="Buscar un producto" onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <Icono n="buscar" tam={20} />
+                <input
+                  className="campo-chico"
+                  style={{ flex: 1, minWidth: 0 }}
+                  autoFocus
+                  autoComplete="off"
+                  maxLength={60}
+                  placeholder="Escribe el nombre del producto"
+                  value={consulta}
+                  onChange={(e) => setConsulta(e.target.value)}
+                />
+                <button className="btn btn-chico btn-sec" style={{ width: 40, padding: 0 }} aria-label="Cerrar la búsqueda" onClick={() => setBuscando(false)}>
+                  <Icono n="cerrar" tam={18} />
+                </button>
+              </div>
+              <div className="buscar-res">
+                {!consulta.trim() && <small className="suave">Escribe parte del nombre, con o sin tildes.</small>}
+                {consulta.trim() && resultados.length === 0 && <small className="suave">No hay productos con ese nombre.</small>}
+                {resultados.map((p, i) => filaProducto(p, i, catsPorId.get(p.categoria_id)?.nombre))}
+              </div>
+              {resultados.length > 0 && (
+                <button className="btn btn-principal" onClick={() => setBuscando(false)}>
+                  Listo
+                </button>
+              )}
+            </div>
+          </div>,
+          document.body
+        )}
 
       {juntando && (
         <JuntarMesas
@@ -2202,6 +2315,7 @@ const s = {
   },
   etiquetaAgotado: { display: 'inline-block', marginTop: 2, padding: '2px 8px', borderRadius: 8, background: 'var(--rosa)', color: 'var(--rosa-tinta)', fontSize: 12, fontWeight: 800 },
   lista: { display: 'grid', gap: 8 },
+  cabCarta: { display: 'flex', alignItems: 'center', gap: 10, paddingBottom: 10 },
   producto: {
     display: 'flex',
     flexWrap: 'wrap',

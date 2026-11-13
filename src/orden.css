@@ -229,3 +229,107 @@
   bottom: 0;
   padding: 10px 0 calc(10px + var(--seguro-abajo));
 }
+
+
+/* ============================================================================================
+   Categorías en cuadrados + búsqueda (vista de la mesa)
+   ============================================================================================ */
+.cat-grilla {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (min-width: 640px) {
+  .cat-grilla {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1000px) {
+  .cat-grilla {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.cat-cuadro {
+  position: relative;
+  aspect-ratio: 1 / 0.85;
+  min-height: 104px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 8px;
+  text-align: center;
+  background: var(--sup);
+  border: 1.5px solid var(--linea);
+  border-radius: 16px;
+  box-shadow: var(--sombra);
+  color: inherit;
+  cursor: pointer;
+  transition: transform 120ms var(--ease), border-color 200ms var(--ease), background-color 200ms var(--ease);
+}
+.cat-cuadro:active {
+  transform: scale(0.97);
+}
+.cat-cuadro:hover {
+  border-color: var(--marca);
+}
+.cat-cuadro b {
+  font-size: 15px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.cat-cuadro small {
+  font-size: 12px;
+  color: var(--suave);
+}
+.cat-cuadro-ic {
+  color: var(--marca);
+  display: inline-flex;
+}
+.cat-cuadro-n {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 99px;
+  background: var(--marca);
+  color: var(--sobre-marca);
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.buscar-velo {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh 14px 14px;
+}
+.buscar-caja {
+  width: 100%;
+  max-width: 460px;
+  max-height: 80vh;
+  display: grid;
+  gap: 12px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: var(--sup);
+  border-radius: 18px;
+  padding: 14px;
+  box-shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.5);
+}
+.buscar-res {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  overflow-y: auto;
+  min-height: 60px;
+}
