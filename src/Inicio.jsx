@@ -60,6 +60,21 @@ export default function Inicio({ restaurante, conPedidos, ir }) {
   const [datos, setDatos] = useState(null)
   const [error, setError] = useState('')
   const [recarga, setRecarga] = useState(0)
+  const [quien, setQuien] = useState('') // nombre de la persona que inició sesión
+
+  // El saludo es para quien entró: su nombre de perfil (si no tiene, el del local).
+  useEffect(() => {
+    let vigente = true
+    ;(async () => {
+      const { data: u } = await supabase.auth.getUser()
+      if (!u?.user) return
+      const { data } = await supabase.from('perfiles').select('nombre').eq('id', u.user.id).maybeSingle()
+      if (vigente) setQuien(String(data?.nombre ?? '').trim())
+    })()
+    return () => {
+      vigente = false
+    }
+  }, [])
 
   useEffect(() => {
     if (!conPedidos) return
@@ -156,7 +171,7 @@ export default function Inicio({ restaurante, conPedidos, ir }) {
       <header className="ini-cab">
         <div>
           <h2 style={{ margin: 0 }}>
-            {saludo(zona)} <span className="ini-nombre">· {restaurante.nombre}</span>
+            {saludo(zona)}, <span className="ini-nombre">{quien || restaurante.nombre}</span>
           </h2>
           <small className="suave ini-fecha">{fecha}</small>
         </div>

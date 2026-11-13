@@ -5,6 +5,7 @@ import Icono from './iconos'
 import { Cargando, Desplegable, Interruptor, Mensaje, Confirmar, Vacio } from './ui'
 import { avisar, sentir, sonar, vibrar } from './feedback'
 import { ordenarNombre } from './orden'
+import ImportarCarta, { descargarCartaExcel } from './ImportarCarta'
 
 // Sirve solo para el reporte mensual (separar "platos más vendidos" de "postres favoritos").
 const TIPOS = [
@@ -27,6 +28,7 @@ export default function Menu({ restaurante }) {
   const [editando, setEditando] = useState(null) // { tipo: 'prod' | 'cat', id, nombre, precio?, original? }
   const [confProd, setConfProd] = useState(null) // producto que se está por eliminar
   const [agregando, setAgregando] = useState(null) // categoría con el formulario de producto nuevo
+  const [importando, setImportando] = useState(false) // ventana de importar desde Excel
 
   function desplegar(id) {
     sentir('toque')
@@ -184,7 +186,24 @@ export default function Menu({ restaurante }) {
         <small className="suave">
           Precios en {restaurante.moneda_codigo} ({restaurante.moneda_simbolo}). Usa «Editar» o el lápiz para cambiar algo.
         </small>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+          <button
+            className="btn btn-chico btn-sec"
+            onClick={() => {
+              sentir('toque')
+              setImportando(true)
+            }}
+          >
+            <Icono n="lista" tam={16} className="it" /> Importar desde Excel
+          </button>
+          <button className="btn btn-chico btn-sec" onClick={() => descargarCartaExcel(restaurante, cats, prods)}>
+            <Icono n="paquete" tam={16} className="it" /> {prods.length ? 'Descargar carta en Excel' : 'Descargar plantilla Excel'}
+          </button>
+        </div>
       </div>
+      {importando && (
+        <ImportarCarta restaurante={restaurante} cats={cats} prods={prods} onCerrar={() => setImportando(false)} onListo={cargar} />
+      )}
 
       <Mensaje tipo="error">{error}</Mensaje>
 
