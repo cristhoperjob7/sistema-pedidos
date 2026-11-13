@@ -18,7 +18,9 @@
   box-shadow: var(--sombra);
   max-height: calc(100dvh - 96px);
   overflow-y: auto;
+  overflow-x: hidden;
 }
+.lateral .btn { white-space: normal; min-width: 0 }
 .lateral-sec {
   padding: 14px 10px 4px;
   font-size: 11px;

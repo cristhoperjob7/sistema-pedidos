@@ -243,7 +243,10 @@ export default function Inicio({ restaurante, conPedidos, ir }) {
               <div className="ini-dos">
                 <GraficoHoras r={r} fmt={fmt} />
                 <section className="ini-tarjeta">
-                  <h3>Lo más vendido hoy</h3>
+                  <div className="ini-tit-enlace">
+                    <h3>Lo más vendido hoy</h3>
+                    <button className="btn btn-chico btn-fantasma" onClick={() => ir('reporte')}>Ver reporte ›</button>
+                  </div>
                   {r.top.length === 0 ? (
                     <Vacio texto="Cuando se cobren cuentas, aquí verás los platos estrella del día." />
                   ) : (
@@ -265,7 +268,10 @@ export default function Inicio({ restaurante, conPedidos, ir }) {
 
               {r.pagos.length > 0 && (
                 <section className="ini-tarjeta">
-                  <h3>Cómo pagaron hoy</h3>
+                  <div className="ini-tit-enlace">
+                    <h3>Cómo pagaron hoy</h3>
+                    <button className="btn btn-chico btn-fantasma" onClick={() => ir('caja')}>Ver cierre de caja ›</button>
+                  </div>
                   <ul className="ini-pagos">
                     {r.pagos.map(([nombre, total]) => (
                       <li key={nombre}>

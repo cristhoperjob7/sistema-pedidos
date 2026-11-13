@@ -42,7 +42,7 @@ export default function Reporte({ restaurante }) {
     supabase
       .from('pedidos')
       .select(
-        'id, numero, total, propina, estado, mesero_id, mesa_numero, metodos_pago(nombre), pagos_pedido(monto_venta, metodos_pago(nombre)), items_pedido(nombre, cantidad, tipo)'
+        'id, numero, total, propina, estado, mesero_id, mesa_numero, llevar_numero, items_pedido(nombre, cantidad, tipo)'
       )
       .eq('restaurante_id', restaurante.id)
       .eq('dia', dia)
@@ -71,10 +71,9 @@ export default function Reporte({ restaurante }) {
     const nombre = (id) => nombres[id] ?? 'Sin asignar'
     const pagados = pedidos.filter((p) => p.estado === 'pagado')
     const vendido = pagados.reduce((t, p) => t + Number(p.total), 0)
-    const propinas = pagados.reduce((t, p) => t + Number(p.propina ?? 0), 0)
+    const llevar = pagados.filter((p) => p.llevar_numero != null).reduce((t, p) => t + Number(p.total), 0)
 
     const porTipo = { plato: new Map(), postre: new Map(), bebida: new Map(), otro: new Map() }
-    const pagos = new Map()
     const meseras = new Map()
     pagados.forEach((p) => {
       p.items_pedido.forEach((i) => {
@@ -82,32 +81,23 @@ export default function Reporte({ restaurante }) {
         const m = porTipo[tipo] ?? porTipo.otro
         m.set(i.nombre, (m.get(i.nombre) ?? 0) + i.cantidad)
       })
-      // Cada línea de pago suma a su método (un pago dividido reparte la venta entre varios).
-      if (p.pagos_pedido?.length) {
-        p.pagos_pedido.forEach((l) => {
-          const metodo = l.metodos_pago?.nombre ?? 'Sin método'
-          pagos.set(metodo, (pagos.get(metodo) ?? 0) + Number(l.monto_venta))
-        })
-      } else if (Number(p.total) > 0) {
-        const metodo = p.metodos_pago?.nombre ?? 'Sin método'
-        pagos.set(metodo, (pagos.get(metodo) ?? 0) + Number(p.total))
-      }
-      const m = meseras.get(nombre(p.mesero_id)) ?? { cuentas: 0, total: 0 }
+      const m = meseras.get(nombre(p.mesero_id)) ?? { cuentas: 0, total: 0, propinas: 0 }
       m.cuentas += 1
       m.total += Number(p.total)
+      m.propinas += Number(p.propina ?? 0)
       meseras.set(nombre(p.mesero_id), m)
     })
 
     return {
       vendido,
-      propinas,
+      salon: vendido - llevar,
+      llevar,
       cuentas: pagados.length,
       ticketPromedio: pagados.length ? vendido / pagados.length : 0,
       abiertas: pedidos.filter((p) => p.estado === 'abierto').length,
       topPorTipo: ORDEN_TIPOS.map((tipo) => [tipo, [...porTipo[tipo].entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)]).filter(
         ([, lista]) => lista.length > 0
       ),
-      pagos: [...pagos.entries()].sort((a, b) => b[1] - a[1]),
       meseras: [...meseras.entries()].sort((a, b) => b[1].total - a[1].total),
     }
   }, [pedidos, nombres])
@@ -160,14 +150,6 @@ export default function Reporte({ restaurante }) {
                 <NumeroAnimado valor={r.cuentas} />
               </b>
             </div>
-            {r.propinas > 0 && (
-              <div style={s.kpi}>
-                <small style={s.suave}>Propinas (aparte de lo vendido)</small>
-                <b style={s.kpiValor}>
-                  <NumeroAnimado valor={r.propinas} formato={(n) => formatear(n, restaurante)} />
-                </b>
-              </div>
-            )}
             <div style={s.kpi}>
               <small style={s.suave}>Ticket promedio</small>
               <b style={s.kpiValor}>
@@ -175,6 +157,20 @@ export default function Reporte({ restaurante }) {
               </b>
             </div>
           </div>
+          {r.vendido > 0 && (
+            <div className="tarjeta aparece" style={{ display: 'grid', gap: 8, borderRadius: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                <span><Icono n="cubiertos" tam={15} className="it" /> En el salón <b>{formatear(r.salon, restaurante)}</b></span>
+                <span><Icono n="bolsa" tam={15} className="it" /> Para llevar <b>{formatear(r.llevar, restaurante)}</b></span>
+              </div>
+              <span style={{ ...s.pista, display: 'flex' }} aria-hidden="true">
+                <i style={{ ...s.relleno, width: `${(r.salon / r.vendido) * 100}%` }} />
+              </span>
+              <small style={s.suave}>
+                {Math.round((r.salon / r.vendido) * 100)}% salón · {Math.round((r.llevar / r.vendido) * 100)}% para llevar. El cobro por método de pago está en Cierre de caja.
+              </small>
+            </div>
+          )}
           {r.abiertas > 0 && (
             <small style={s.suave}>Hay {r.abiertas} cuenta(s) abierta(s) que todavía no se suman a las ventas.</small>
           )}
@@ -217,23 +213,18 @@ export default function Reporte({ restaurante }) {
             )
           })}
 
-          <h4 style={s.titulo}>Por salón</h4>
+          <h4 style={s.titulo}>Por persona</h4>
           {r.meseras.length === 0 && <small style={s.suave}>Sin ventas todavía.</small>}
           {r.meseras.map(([nombre, m], i) => (
             <div key={nombre} className="entra" style={{ ...s.fila, animationDelay: `${i * 40}ms` }}>
-              <span>
-                {nombre} <small style={s.suave}>· {m.cuentas} cuenta(s)</small>
+              <span style={{ minWidth: 0 }}>
+                <b>{nombre}</b>
+                <small style={{ ...s.suave, display: 'block' }}>
+                  {m.cuentas} cuenta{m.cuentas === 1 ? '' : 's'}
+                  {m.propinas > 0 ? ` · propinas ${formatear(m.propinas, restaurante)}` : ''}
+                </small>
               </span>
-              <b>{formatear(m.total, restaurante)}</b>
-            </div>
-          ))}
-
-          <h4 style={s.titulo}>Por método de pago</h4>
-          {r.pagos.length === 0 && <small style={s.suave}>Sin ventas todavía.</small>}
-          {r.pagos.map(([nombre, total], i) => (
-            <div key={nombre} className="entra" style={{ ...s.fila, animationDelay: `${i * 40}ms` }}>
-              <span>{nombre}</span>
-              <b>{formatear(total, restaurante)}</b>
+              <b style={{ whiteSpace: 'nowrap' }}>{formatear(m.total, restaurante)}</b>
             </div>
           ))}
         </>

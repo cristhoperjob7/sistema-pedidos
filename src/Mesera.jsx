@@ -383,13 +383,13 @@ export default function Mesera({ restaurante, rol = 'mesera', cajaDe = null }) {
                   </button>
                   <Desplegable abierto={!!lista || porCobrar}>
                     {lista ? (
-                      <button className="btn btn-principal btn-chico btn-bloque" style={{ marginTop: 6 }} onClick={() => entregar(p, true)}>
+                      <button className="btn btn-principal btn-chico btn-bloque" style={s.botonTarjeta} onClick={() => entregar(p, true)}>
                         <Icono n="check" tam={15} className="it" /> Entregar y cobrar
                       </button>
                     ) : (
                       <button
                         className="btn btn-principal btn-chico btn-bloque"
-                        style={{ marginTop: 6 }}
+                        style={s.botonTarjeta}
                         onClick={() => {
                           sentir('toque')
                           setVista({ nombre: 'cobrar', llevarId: p.id })
@@ -468,7 +468,7 @@ export default function Mesera({ restaurante, rol = 'mesera', cajaDe = null }) {
               <Desplegable abierto={!!lista}>
                 <button
                   className="btn btn-principal btn-chico btn-bloque"
-                  style={{ marginTop: 6 }}
+                  style={s.botonTarjeta}
                   onClick={() => entregar(p)}
                 >
                   <Icono n="check" tam={15} className="it" /> Entregado
@@ -2122,6 +2122,8 @@ const s = {
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(140px, 40vw), 1fr))', gap: 12 },
   mesa: {
     display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1fr)', // el contenido se ajusta al ancho de la tarjeta, nunca la desborda
+    minWidth: 0,
     gap: 4,
     alignContent: 'start',
     textAlign: 'left',
@@ -2135,6 +2137,8 @@ const s = {
   // El botón que abre la mesa ocupa toda la tarjeta; "Entregado" va aparte, debajo.
   mesaBoton: {
     display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1fr)',
+    minWidth: 0,
     gap: 4,
     alignContent: 'start',
     width: '100%',
@@ -2147,6 +2151,7 @@ const s = {
     font: 'inherit',
     cursor: 'pointer',
   },
+  botonTarjeta: { marginTop: 6, whiteSpace: 'normal', minWidth: 0, paddingInline: 8, lineHeight: 1.15 },
   mesaLista: { background: 'var(--menta)', borderColor: 'var(--menta-tinta)' },
   mesaLibre: { background: 'var(--sup)', borderColor: 'var(--linea)' },
   mesaOcupada: { background: 'var(--durazno)', borderColor: 'var(--borde-aviso)' },

@@ -435,3 +435,20 @@
 .asist-mini svg:last-child {
   margin-left: auto;
 }
+
+/* Título de tarjeta con enlace a la pantalla donde está el detalle */
+.ini-tit-enlace {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-bottom: 12px;
+}
+.ini-tit-enlace h3 {
+  margin: 0;
+}
+.ini-tit-enlace .btn {
+  margin-right: -8px;
+  min-height: 34px;
+}

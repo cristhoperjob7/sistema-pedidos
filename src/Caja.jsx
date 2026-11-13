@@ -186,8 +186,6 @@ export default function Caja({ restaurante }) {
       <div style={s.kpis}>
         {tarjeta('Vendido', $(ventas), `${pedidos} pedido${pedidos === 1 ? '' : 's'}`)}
         {tarjeta('Propinas', $(propinas), 'aparte de lo vendido')}
-        {tarjeta('En el salón', $(res.ventas_salon))}
-        {tarjeta('Para llevar', $(res.ventas_llevar))}
         {Number(res.descuentos) > 0 && tarjeta('Descuentos', $(res.descuentos), `${res.n_descuentos} cuenta${Number(res.n_descuentos) === 1 ? '' : 's'}`)}
         {Number(res.anulado) > 0 && tarjeta('Anulado', $(res.anulado))}
       </div>
