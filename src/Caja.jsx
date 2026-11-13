@@ -22,6 +22,7 @@ export default function Caja({ restaurante }) {
   const [historial, setHistorial] = useState([])
   const [error, setError] = useState('')
   const [contado, setContado] = useState('')
+  const [contadoDe, setContadoDe] = useState(null) // { nombre } si el contado se tomó de la última caja cerrada
   const [nota, setNota] = useState('')
   const [confirmar, setConfirmar] = useState(false)
   const [trabajando, setTrabajando] = useState(false)
@@ -50,15 +51,25 @@ export default function Caja({ restaurante }) {
     const nombres = Object.fromEntries((m.data ?? []).map((x) => [x.usuario_id, x.nombre]))
     const zona = restaurante.zona_horaria || 'America/Santiago'
     const dDe = (iso) => new Date(iso).toLocaleDateString('en-CA', { timeZone: zona })
-    setTurnos(
-      (t.data ?? [])
-        .filter((x) => x.cerrado_en == null || dDe(x.abierto_en) === dia || dDe(x.cerrado_en) === dia)
-        .map((x) => ({ ...x, nombre: nombres[x.usuario_id] ?? 'Sin nombre' }))
-    )
+    const delDia = (t.data ?? [])
+      .filter((x) => x.cerrado_en == null || dDe(x.abierto_en) === dia || dDe(x.cerrado_en) === dia)
+      .map((x) => ({ ...x, nombre: nombres[x.usuario_id] ?? 'Sin nombre' }))
+    setTurnos(delDia)
+    // Si todas las cajas del día están cerradas, lo que contó la última es lo que hay en el cajón:
+    // se propone como "efectivo contado" del día (se puede cambiar si se vuelve a contar).
+    const ultima = delDia.every((x) => x.cerrado_en != null)
+      ? delDia.filter((x) => x.efectivo_contado != null).sort((a, b) => new Date(b.cerrado_en) - new Date(a.cerrado_en))[0]
+      : null
+    if (ultima && !r.data?.cierre) {
+      setContado((c) => (c === '' ? String(Number(ultima.efectivo_contado)) : c))
+      setContadoDe((d) => d ?? { nombre: ultima.nombre })
+    }
   }, [restaurante.id, restaurante.zona_horaria, dia])
 
   useEffect(() => {
     setRes(null)
+    setContado('')
+    setContadoDe(null)
     setConfirmar(false)
     setReabrir(false)
     cargar()
@@ -110,6 +121,7 @@ export default function Caja({ restaurante }) {
     avisar(`Caja del ${fechaLarga(dia)} cerrada`, 'ok')
     setConfirmar(false)
     setContado('')
+    setContadoDe(null)
     setNota('')
     cargar()
   }
@@ -174,6 +186,12 @@ export default function Caja({ restaurante }) {
       {!cierre && res.abiertos > 0 && (
         <p style={{ margin: 0, padding: '10px 12px', borderRadius: 12, background: 'var(--durazno)', border: '1px solid var(--borde-aviso)', color: 'var(--aviso-tinta)', fontWeight: 700 }}>
           <Icono n="alerta" tam={15} className="it" /> Hay {res.abiertos} cuenta{res.abiertos === 1 ? '' : 's'} abierta{res.abiertos === 1 ? '' : 's'} de este día. Cóbralas o anúlalas para poder cerrar la caja.
+        </p>
+      )}
+
+      {!cierre && !hayTurnoAbierto && turnos.length > 0 && (
+        <p style={{ margin: 0, padding: '10px 12px', borderRadius: 12, background: 'var(--menta)', border: '1px solid var(--borde-menta)', color: 'var(--menta-tinta)', fontWeight: 700 }}>
+          <Icono n="check" tam={15} className="it" /> Todas las cajas de las meseras están cerradas. Falta el cierre del día: revisa y presiona «Cerrar caja del día» abajo.
         </p>
       )}
 
@@ -287,7 +305,19 @@ export default function Caja({ restaurante }) {
           </div>
           <label style={{ display: 'grid', gap: 4 }}>
             <span style={{ fontWeight: 700 }}>Efectivo contado (opcional)</span>
-            <input className="campo-chico" inputMode="decimal" placeholder="Lo que hay en la caja" value={contado} onChange={(e) => setContado(soloPrecio(e.target.value, restaurante))} />
+            <input
+              className="campo-chico"
+              inputMode="decimal"
+              placeholder="Lo que hay en la caja"
+              value={contado}
+              onChange={(e) => {
+                setContado(soloPrecio(e.target.value, restaurante))
+                setContadoDe(null)
+              }}
+            />
+            {contadoDe && (
+              <small className="suave">Es lo que contó {contadoDe.nombre} al cerrar la última caja. Cámbialo si vuelves a contar.</small>
+            )}
           </label>
           {diferencia != null && (
             <p className="aparece" style={{ margin: 0, fontWeight: 800, color: colorDif(diferencia) }}>

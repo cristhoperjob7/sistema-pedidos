@@ -10,7 +10,6 @@ export default function Local({ restaurante }) {
   const [mesas, setMesas] = useState(null)
   const [pagos, setPagos] = useState([])
   const [aj, setAj] = useState(null)
-  const [nuevoPago, setNuevoPago] = useState('')
   const [error, setError] = useState('')
   const [confMesa, setConfMesa] = useState(null) // id de la mesa a eliminar, o 'todas'
   const [agregando, setAgregando] = useState(false)
@@ -81,29 +80,9 @@ export default function Local({ restaurante }) {
     }
   }
 
-  async function agregarPago(e) {
-    e.preventDefault()
-    setError('')
-    const nombre = nuevoPago.trim()
-    if (!nombre) return setError('Escribe el nombre del método de pago.')
-    sentir('toque', 'pop')
-    const orden = pagos.reduce((mx, p) => Math.max(mx, p.orden), 0) + 1
-    const { error } = await supabase.from('metodos_pago').insert({ restaurante_id: restaurante.id, nombre, orden })
-    if (error) return setError(error.message)
-    vibrar('exito')
-    avisar(`"${nombre}" agregado`)
-    setNuevoPago('')
-    cargar()
-  }
-
-  async function guardarNombrePago(p, texto) {
-    const nombre = texto.trim()
-    if (!nombre) {
-      setError('El nombre no puede quedar vacío.')
-      return false
-    }
-    return actualizar('metodos_pago', { id: p.id }, { nombre })
-  }
+  // Métodos de pago fijos (Efectivo, Transferencia, Crédito, Débito) y los antiguos, que solo quedan en el historial.
+  const fijos = pagos.filter((p) => p.tipo)
+  const antiguos = pagos.filter((p) => !p.tipo)
 
   async function guardarMinutos(campo, texto) {
     const n = Number(texto)
@@ -204,40 +183,33 @@ export default function Local({ restaurante }) {
 
       <section className="tarjeta" style={s.caja}>
         <h3 style={{ margin: 0 }}>Métodos de pago</h3>
-        {pagos.map((p) => (
+        <small className="suave">
+          Son siempre estos cuatro. No se pueden agregar ni renombrar: solo activar o desactivar los que el local no usa.
+        </small>
+        {fijos.map((p) => (
           <div key={p.id} style={{ display: 'grid', gap: 6 }}>
-          <div className="entra" style={{ ...s.fila, opacity: p.activo ? 1 : 0.55 }}>
-            <Campo
-              className="campo-chico"
-              style={{ flex: '1 1 140px', minWidth: 0 }}
-              valor={p.nombre}
-              onGuardar={(t) => guardarNombrePago(p, t)}
-            />
-            <button
-              className="btn btn-chico btn-suave"
-              onClick={() => {
-                sentir('toque', 'tic')
-                actualizar('metodos_pago', { id: p.id }, { activo: !p.activo })
-              }}
-            >
-              {p.activo ? 'Desactivar' : 'Activar'}
-            </button>
-          </div>
-          {/transfer/i.test(p.nombre) && (
-            <DatosTransferencia metodo={p} onGuardar={(datos) => actualizar('metodos_pago', { id: p.id }, { datos })} />
-          )}
+            <div className="entra" style={{ ...s.fila, opacity: p.activo ? 1 : 0.55 }}>
+              <b style={{ flex: '1 1 140px', minWidth: 0 }}>{p.nombre}</b>
+              <Interruptor
+                checked={p.activo}
+                onChange={(v) => actualizar('metodos_pago', { id: p.id }, { activo: v })}
+              >
+                {p.activo ? 'Activo' : 'Desactivado'}
+              </Interruptor>
+            </div>
+            {p.tipo === 'transferencia' && (
+              <DatosTransferencia metodo={p} onGuardar={(datos) => actualizar('metodos_pago', { id: p.id }, { datos })} />
+            )}
           </div>
         ))}
-        <form onSubmit={agregarPago} style={s.nuevo}>
-          <input
-            className="campo-chico"
-            style={{ flex: '1 1 160px', minWidth: 0 }}
-            placeholder="Nuevo método (ej: Transferencia)"
-            value={nuevoPago}
-            onChange={(e) => setNuevoPago(e.target.value)}
-          />
-          <button className="btn btn-chico btn-principal">+ Agregar</button>
-        </form>
+        {fijos.length < 4 && (
+          <Mensaje tipo="error">Faltan métodos de pago. Ejecuta paso30.sql en Supabase para dejarlos listos.</Mensaje>
+        )}
+        {antiguos.length > 0 && (
+          <small className="suave">
+            Ya no se usan (quedan solo en el historial de ventas): {antiguos.map((p) => p.nombre).join(', ')}.
+          </small>
+        )}
       </section>
 
       {aj && (

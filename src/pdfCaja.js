@@ -45,7 +45,7 @@ export function abrirPDFCaja({ restaurante, dia, res, turnos = [], cierre }) {
 
   // ---- Qué hay que revisar (solo aparece lo que importa) ----
   const alertas = []
-  if (!cerrada) alertas.push(['aviso', 'La caja de este día todavía no está cerrada. Las cifras pueden cambiar.'])
+  if (!cerrada) alertas.push(['aviso', 'Falta el cierre del día (lo hace la administración en Cierre de caja). Las cifras pueden cambiar.'])
   if (abiertas > 0) alertas.push(['mal', `Hay ${abiertas} cuenta${abiertas === 1 ? '' : 's'} abierta${abiertas === 1 ? '' : 's'} sin cobrar.`])
   if (cerrada && dif !== null && !cuadra) alertas.push(['mal', `Diferencia en el efectivo del día: ${textoDif.toLowerCase()}.`])
   if (descuentos > 0) alertas.push(['info', `Descuentos y cortesías del día: ${$(descuentos)} en ${Number(res.n_descuentos ?? 0)} cuenta${Number(res.n_descuentos) === 1 ? '' : 's'}.`])
@@ -142,7 +142,7 @@ export function abrirPDFCaja({ restaurante, dia, res, turnos = [], cierre }) {
       <h1>Cierre de caja</h1>
       <div class="fecha">${esc(fecha)}</div>
     </div>
-    <span class="estado ${cerrada ? 'cerrada' : 'abierta'}">${cerrada ? 'Caja cerrada ' + new Date(cierre.cerrado_en).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short', timeZone: zona }) : 'PROVISORIO · sin cerrar'}</span>
+    <span class="estado ${cerrada ? 'cerrada' : 'abierta'}">${cerrada ? 'Caja cerrada ' + new Date(cierre.cerrado_en).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short', timeZone: zona }) : 'PROVISORIO · falta el cierre del día (administración)'}</span>
   </header>
 
   <section class="kpis">

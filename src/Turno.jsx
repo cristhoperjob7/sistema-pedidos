@@ -172,6 +172,7 @@ export default function Turno({ restaurante, children }) {
           <p style={{ margin: 0, fontWeight: 800, color: Math.abs(dif) < 0.005 ? 'var(--menta-tinta)' : 'var(--rosa-tinta)' }}>
             {Math.abs(dif) < 0.005 ? <><Icono n="check" tam={15} className="it" /> Cuadra perfecto</> : dif > 0 ? `Sobran ${$(dif)}` : `Faltan ${$(-dif)}`}
           </p>
+          <small className="suave">Entrega el efectivo según lo acordado. El cierre del día lo hace la administración.</small>
         </div>
       )}
 

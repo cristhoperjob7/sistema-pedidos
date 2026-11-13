@@ -1835,7 +1835,7 @@ function Cobrar({ restaurante, datos, rol, cajaDe, mesa, pedido, items, onVolver
                 className="btn btn-principal btn-grande entra"
                 style={{ animationDelay: `${120 + i * 50}ms`, opacity: trabajando === m.id ? 1 : undefined }}
                 disabled={!!trabajando || propinaInvalida || !!cajaDe}
-                onClick={(e) => (esEfectivo(m.nombre) ? abrirEfectivo(m) : esTransferencia(m.nombre) ? abrirTransferencia(m) : cobrar(m, e))}
+                onClick={(e) => ((m.tipo ? m.tipo === 'efectivo' : esEfectivo(m.nombre)) ? abrirEfectivo(m) : (m.tipo ? m.tipo === 'transferencia' : esTransferencia(m.nombre)) ? abrirTransferencia(m) : cobrar(m, e))}
               >
                 {trabajando === m.id ? <span className="puntos">Cobrando</span> : m.nombre}
               </button>
