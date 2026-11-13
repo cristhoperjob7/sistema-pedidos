@@ -350,7 +350,7 @@ export default function Mesera({ restaurante, rol = 'mesera', cajaDe = null }) {
               return (
                 <div
                   key={p.id}
-                  className={`entra${lista ? ' mesa-lista' : ''}${ancho && mesa && mesa.id === m.id ? ' mesa-sel' : ''}`}
+                  className={`entra${lista ? ' mesa-lista' : ''}${ancho && enVistaLlevar && vista.llevarId === p.id ? ' mesa-sel' : ''}`}
                   style={{ ...s.mesa, ...(lista ? s.mesaLista : s.mesaOcupada), animationDelay: `${Math.min(i, 12) * 30}ms` }}
                 >
                   <button
