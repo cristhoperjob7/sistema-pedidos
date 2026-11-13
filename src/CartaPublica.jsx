@@ -80,7 +80,6 @@ export default function CartaPublica({ slug, token }) {
   const [rechOculta, setRechOculta] = useState(null) // aviso de rechazo que el cliente ya cerró (o que se escondió solo)
   const [detalle, setDetalle] = useState(null) // { p, cat }: ficha de un plato
   const [clave] = useState(claveCelular)
-  const [zoom, setZoom] = useState(null)
   const [mesaEstado, setMesaEstado] = useState({ cuenta_abierta: false, cuenta_pedida: false, qr_bloqueado: false })
   const [finalizada, setFinalizada] = useState(() => leer('qr-fin-' + token) === '1')
   const vioCuenta = useRef(false) // ¿se vio la cuenta abierta desde este celular?
@@ -408,21 +407,11 @@ export default function CartaPublica({ slug, token }) {
 
   const bloqueado = !!mesaEstado.qr_bloqueado
   const puedePedir = carta.puede_pedir && !bloqueado
-  const L = carta.landing ?? {}
-  const sobre = L.sobre?.activo ? L.sobre : null
-  const galeria = L.galeria?.activo && (L.galeria.fotos ?? []).some(fotoOk) ? L.galeria : null
-  const bloques = (L.bloques ?? []).filter((b) => b.titulo || b.texto || fotoOk(b.foto))
-  const info = L.info?.activo ? L.info : null
-  const hayPortada = fotoOk(L.portada)
-  const completa = hayPortada && L.portada_modo === 'completa'
-  const velo = Math.min(0.7, Math.max(0, Number(L.portada_vel ?? 30) / 100))
+  // Diseño fijo para todos los locales: la foto de fondo de la portada sale sola de los platos
+  // (el destacado con foto primero). Si ningún plato tiene foto, se usa un degradado con el color del local.
+  const conFoto = carta.categorias.flatMap((c) => c.productos).filter((p) => fotoOk(p.foto) && !p.agotado)
+  const fondoPortada = (conFoto.find((p) => p.destacado) ?? conFoto[0])?.foto ?? null
   const rotulo = carta.llevar ? <><Icono n="bolsa" tam={15} className="it" /> Pedido para llevar</> : `Mesa ${carta.mesa?.numero}${carta.mesa?.nombre ? ` · ${carta.mesa.nombre}` : ''}`
-
-  const digitos = (t) => String(t ?? '').replace(/\D/g, '')
-  const wa = digitos(info?.whatsapp)
-  const tel = digitos(info?.telefono)
-  const insta = String(info?.instagram ?? '').replace(/^@/, '').replace(/[^A-Za-z0-9._]/g, '')
-  const hayInfo = info && (info.horario || info.direccion || tel || wa || insta || info.wifi_red)
 
   const irCarta = () => document.getElementById('carta')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
@@ -543,23 +532,12 @@ export default function CartaPublica({ slug, token }) {
       <style>{CSS}</style>
 
       {/* PORTADA */}
-      <header className={`cp-hero${completa ? ' completa' : ''}`} style={{ '--vel': velo }}>
-        {hayPortada && (
-          <img
-            className={`cp-hero-img${completa ? ' difuso' : ''}`}
-            src={L.portada}
-            alt=""
-            fetchpriority="high"
-            decoding="async"
-            style={completa ? undefined : { objectPosition: `${Number(L.portada_x ?? 50)}% ${Number(L.portada_y ?? 50)}%` }}
-          />
-        )}
+      <header className="cp-hero">
+        {fondoPortada && <img className="cp-hero-img" src={fondoPortada} alt="" fetchpriority="high" decoding="async" />}
         <div className="cp-vel" />
         <div className="cp-hero-in">
-          {hayPortada && completa && <img className="cp-marco" src={L.portada} alt="" />}
           {rest.logo ? <img className="cp-logo" src={rest.logo} alt="" /> : null}
           <h1>{rest.nombre}</h1>
-          {L.eslogan ? <p className="cp-eslogan">{L.eslogan}</p> : null}
           <span className="cp-pill">{rotulo}</span>
           <div className="cp-cta">
             <button className="cp-boton cp-boton-fuerte" onClick={irCarta}>Ver la carta</button>
@@ -582,23 +560,6 @@ export default function CartaPublica({ slug, token }) {
           {aviso && <div className="cp-aviso" role="status">{aviso}</div>}
         </div>
       </header>
-
-      {/* NOVEDADES */}
-      {bloques.length > 0 && (
-        <section className="cp-wrap cp-seccion">
-          <div className="cp-novedades">
-            {bloques.map((b) => (
-              <article key={b.id} className="cp-novedad">
-                {fotoOk(b.foto) && <img src={b.foto} alt="" loading="lazy" decoding="async" />}
-                <div>
-                  {b.titulo ? <h3>{b.titulo}</h3> : null}
-                  {b.texto ? <p>{b.texto}</p> : null}
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
 
       {/* CARTA */}
       <section id="carta" className="cp-seccion">
@@ -681,60 +642,6 @@ export default function CartaPublica({ slug, token }) {
           )}
         </div>
       </section>
-
-      {/* SOBRE NOSOTROS */}
-      {sobre && (sobre.texto || fotoOk(sobre.foto)) && (
-        <section className="cp-wrap cp-seccion">
-          <h2 className="cp-titulo">{sobre.titulo || 'Sobre nosotros'}</h2>
-          <div className="cp-sobre">
-            {fotoOk(sobre.foto) && <img src={sobre.foto} alt="" loading="lazy" decoding="async" />}
-            {sobre.texto ? <p>{sobre.texto}</p> : null}
-          </div>
-        </section>
-      )}
-
-      {/* GALERÍA */}
-      {galeria && (
-        <section className="cp-wrap cp-seccion">
-          <h2 className="cp-titulo">{galeria.titulo || 'Galería'}</h2>
-          <div className="cp-galeria">
-            {galeria.fotos.filter(fotoOk).map((u) => (
-              <button key={u} onClick={() => setZoom(u)} aria-label="Ver foto grande">
-                <img src={u} alt="" loading="lazy" decoding="async" />
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* CONTACTO */}
-      {hayInfo && (
-        <section className="cp-wrap cp-seccion">
-          <h2 className="cp-titulo">Visítanos</h2>
-          <div className="cp-info">
-            {info.horario ? (
-              <div><span><Icono n="reloj" tam={15} className="it" /> Horario</span><p style={{ whiteSpace: 'pre-line' }}>{info.horario}</p></div>
-            ) : null}
-            {info.direccion ? (
-              <div>
-                <span><Icono n="pin" tam={15} className="it" /> Dirección</span>
-                <p>{info.direccion}</p>
-                <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(info.direccion)}`} target="_blank" rel="noreferrer">Cómo llegar</a>
-              </div>
-            ) : null}
-            {(tel || wa || insta) && (
-              <div className="cp-links">
-                {tel ? <a href={`tel:+${tel}`}><Icono n="telefono" tam={15} className="it" /> Llamar</a> : null}
-                {wa ? <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer"><Icono n="chat" tam={15} className="it" /> WhatsApp</a> : null}
-                {insta ? <a href={`https://instagram.com/${insta}`} target="_blank" rel="noreferrer"><Icono n="camara" tam={15} className="it" /> @{insta}</a> : null}
-              </div>
-            )}
-            {info.wifi_red ? (
-              <div><span><Icono n="wifi" tam={15} className="it" /> Wi‑Fi</span><p>{info.wifi_red}{info.wifi_clave ? ` · clave: ${info.wifi_clave}` : ''}</p></div>
-            ) : null}
-          </div>
-        </section>
-      )}
 
       <footer className="cp-pie">{rest.nombre}</footer>
 
@@ -827,14 +734,6 @@ export default function CartaPublica({ slug, token }) {
         document.body
       )}
 
-      {zoom && createPortal(
-        <div className="cp-zoom" onClick={() => setZoom(null)} role="dialog" aria-modal="true" aria-label="Foto">
-          <img src={zoom} alt="" />
-          <button aria-label="Cerrar" onClick={() => setZoom(null)}><Icono n="cerrar" tam={15} className="it" /></button>
-        </div>,
-        document.body
-      )}
-
       {verPedido && createPortal(
         <div className="hoja-velo funde" onClick={() => !enviando && setVerPedido(false)}>
           <div className="hoja sube" role="dialog" aria-modal="true" aria-label="Mi pedido" onClick={(e) => e.stopPropagation()}>
@@ -900,29 +799,18 @@ const CSS = `
 .cp-seccion{padding-top:34px}
 .cp-titulo{font-family:'Fraunces',Georgia,'Times New Roman',serif;font-size:27px;line-height:1.15;margin:0 0 12px}
 .cp-suave{color:var(--suave);margin:0 0 8px;font-size:15px}
-.cp-hero{position:relative;overflow:hidden;min-height:min(80svh,600px);display:grid;align-items:end;background:linear-gradient(160deg,color-mix(in srgb,var(--marca) 60%,var(--fondo)),var(--fondo) 85%);color:#fff}
+.cp-hero{position:relative;overflow:hidden;min-height:min(72svh,560px);display:grid;align-items:end;background:linear-gradient(160deg,color-mix(in srgb,var(--marca) 60%,var(--fondo)),var(--fondo) 85%);color:#fff}
 .cp-hero-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.cp-hero-img.difuso{filter:blur(34px) brightness(.55) saturate(1.1);transform:scale(1.2)}
-.cp-vel{position:absolute;inset:0;background:linear-gradient(180deg,transparent 45%,var(--fondo) 100%),linear-gradient(rgba(0,0,0,var(--vel,.3)),rgba(0,0,0,var(--vel,.3)))}
-.cp-hero.completa{min-height:0;align-items:start}
-.cp-hero.completa .cp-hero-in{padding-top:26px}
-.cp-marco{width:auto;max-width:min(100%,600px);max-height:46svh;object-fit:contain;border-radius:20px;box-shadow:0 18px 50px rgba(0,0,0,.5)}
+.cp-vel{position:absolute;inset:0;background:linear-gradient(180deg,transparent 45%,var(--fondo) 100%),linear-gradient(rgba(0,0,0,.42),rgba(0,0,0,.42))}
 .cp-hero-in{position:relative;max-width:720px;width:100%;margin:0 auto;padding:56px 18px 30px;display:grid;gap:12px;justify-items:center;text-align:center}
 .cp-logo{max-height:84px;max-width:200px;object-fit:contain;filter:drop-shadow(0 2px 8px rgba(0,0,0,.4))}
 .cp-hero h1{margin:0;font-family:'Fraunces',Georgia,'Times New Roman',serif;font-size:clamp(34px,9vw,52px);line-height:1.05;text-shadow:0 2px 14px rgba(0,0,0,.55);overflow-wrap:anywhere}
-.cp-eslogan{margin:0;font-size:17px;max-width:30ch;text-shadow:0 1px 10px rgba(0,0,0,.6)}
 .cp-pill{display:inline-block;padding:6px 14px;border-radius:999px;background:rgba(0,0,0,.45);backdrop-filter:blur(6px);font-weight:800;font-size:13px;letter-spacing:.4px}
 .cp-cta{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:6px}
 .cp-boton{all:unset;box-sizing:border-box;cursor:pointer;padding:11px 18px;border-radius:999px;background:rgba(255,255,255,.16);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.35);font-weight:800;font-size:15px;color:#fff}
 .cp-boton:disabled{opacity:.55;cursor:default}
 .cp-boton-fuerte{background:var(--marca);border-color:var(--marca);color:var(--sobre-marca)}
 .cp-aviso{padding:8px 14px;border-radius:12px;background:rgba(0,0,0,.55);font-size:14px}
-.cp-novedades{display:grid;gap:12px}
-.cp-novedad{display:grid;border-radius:18px;overflow:hidden;background:var(--sup);border:1px solid var(--linea)}
-.cp-novedad img{width:100%;height:170px;object-fit:cover;display:block}
-.cp-novedad div{padding:14px 16px}
-.cp-novedad h3{margin:0 0 4px;font-size:18px}
-.cp-novedad p{margin:0;color:var(--suave);line-height:1.45;white-space:pre-line}
 .cp-carta-cab{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
 .cp-lupa{all:unset;cursor:pointer;box-sizing:border-box;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:var(--marca);color:var(--sobre-marca)}
 .cp-lupa:active{transform:scale(.94)}
@@ -1039,27 +927,9 @@ const CSS = `
 .cp-det-pie>b{font-size:21px;font-variant-numeric:tabular-nums}
 .cp-aut-x{all:unset;cursor:pointer;flex:none;width:30px;height:30px;margin:-4px -6px -4px 0;border-radius:50%;display:grid;place-items:center;color:inherit}
 .cp-sec-boton:disabled{opacity:.6;cursor:default}
-.cp-sobre{display:grid;gap:14px}
-.cp-sobre img{width:100%;max-height:320px;object-fit:cover;border-radius:20px;display:block}
-.cp-sobre p{margin:0;line-height:1.6;white-space:pre-line;color:var(--tinta)}
-.cp-galeria{display:grid;gap:8px;grid-template-columns:repeat(2,1fr)}
-@media(min-width:560px){.cp-galeria{grid-template-columns:repeat(3,1fr)}}
-.cp-galeria button{all:unset;cursor:pointer;display:block;border-radius:14px;overflow:hidden;aspect-ratio:1}
-.cp-galeria img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s}
-.cp-galeria button:hover img{transform:scale(1.04)}
-.cp-info{display:grid;gap:12px}
-.cp-info>div{padding:14px 16px;border-radius:16px;background:var(--sup);border:1px solid var(--linea)}
-.cp-info span{font-weight:800;font-size:14px;color:var(--suave)}
-.cp-info p{margin:4px 0 0;line-height:1.45}
-.cp-info a{color:var(--marca);font-weight:800;text-decoration:none}
-.cp-links{display:flex;gap:8px;flex-wrap:wrap}
-.cp-links a{padding:9px 16px;border-radius:999px;background:var(--sup);border:1px solid var(--linea);color:var(--tinta)}
 .cp-pie{text-align:center;color:var(--suave);font-size:13px;padding:36px 18px 8px}
 .cp-barra{position:fixed;left:0;right:0;bottom:0;z-index:30;max-width:720px;margin:0 auto;padding:10px 16px calc(10px + var(--seguro-abajo,0px));background:var(--fondo);border-top:1px solid var(--linea)}
 .cp-barra button{all:unset;box-sizing:border-box;width:100%;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-radius:16px;background:var(--marca);color:var(--sobre-marca);font-weight:800}
-.cp-zoom{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.92);display:grid;place-items:center;padding:16px}
-.cp-zoom img{max-width:100%;max-height:92dvh;border-radius:12px;object-fit:contain}
-.cp-zoom button{all:unset;cursor:pointer;position:absolute;top:calc(14px + env(safe-area-inset-top,0px));right:16px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.18);display:grid;place-items:center;color:#fff;font-size:18px}
 `
 
 const s = {

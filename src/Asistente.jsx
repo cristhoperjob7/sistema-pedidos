@@ -18,7 +18,7 @@ const PASOS = [
   { id: 'pagos', ic: 'tarjeta', titulo: 'Elegir métodos de pago', texto: 'Efectivo, tarjeta, transferencia… los que aceptes. Así el cierre de caja cuadra.', ir: 'local', boton: 'Ir a Ajustes' },
   { id: 'personal', ic: 'personas', titulo: 'Invitar al personal', texto: 'Crea el acceso de al menos una persona de salón. La cocina es opcional.', ir: 'personal', boton: 'Ir a Personal' },
   { id: 'pin', ic: 'candado', titulo: 'Definir tu PIN de caja', texto: 'Con este PIN autorizas la apertura de caja de cada mesera.', ir: 'caja', boton: 'Ir a Caja' },
-  { id: 'carta', ic: 'qr', titulo: 'Personalizar la carta QR', texto: 'Sube el logo y escribe una frase de bienvenida para que tus clientes vean tu marca.', ir: 'qr', boton: 'Ir a Carta y QR' },
+  { id: 'carta', ic: 'qr', titulo: 'Subir tu logo', texto: 'Sube tu logo para que tus clientes vean tu marca al escanear el código.', ir: 'qr', boton: 'Ir a Carta y QR' },
   { id: 'imprimir', ic: 'impresora', titulo: 'Imprimir y pegar los QR', texto: 'Imprime las tarjetas y déjalas en cada mesa. Márcalo cuando esté listo.', ir: 'qr', boton: 'Abrir QR', manual: true },
 ]
 
@@ -57,16 +57,15 @@ export default function Asistente({ restaurante, ir }) {
       contar(supabase.from('metodos_pago').select('id', cabeza).eq('restaurante_id', rid).eq('activo', true)),
       contar(supabase.from('miembros').select('id', cabeza).eq('restaurante_id', rid).eq('rol', 'mesera').eq('activo', true)),
       supabase.rpc('tengo_pin_caja', { p_restaurante: rid }),
-      supabase.from('restaurantes').select('logo_qr, landing').eq('id', rid).maybeSingle(),
+      supabase.from('restaurantes').select('logo_qr').eq('id', rid).maybeSingle(),
     ])
-    const landing = rest.data?.landing ?? {}
     setHechos({
       menu: (cats ?? 0) > 0 && (prods ?? 0) > 0,
       mesas: (mesas ?? 0) > 0,
       pagos: (pagos ?? 0) > 0,
       personal: (personal ?? 0) > 0,
       pin: pin.data === true,
-      carta: !!rest.data?.logo_qr || !!landing.eslogan || !!landing.portada,
+      carta: !!rest.data?.logo_qr,
     })
   }, [rid])
 

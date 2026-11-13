@@ -3,7 +3,6 @@ import Icono from './iconos'
 import QRCode from 'qrcode'
 import { supabase } from './supabase'
 import { Cargando, Confirmar, Interruptor, Mensaje, Segmento } from './ui'
-import EditorCarta from './EditorCarta'
 import PlatosCarta from './PlatosCarta'
 import { avisar, sentir } from './feedback'
 import { esHex } from './paletas'
@@ -334,10 +333,11 @@ function Tarjeta({ titulo, sub, img, url, onImprimir, onRegenerar, bloqueoHasta,
   )
 }
 
-// Pestaña "Carta y QR": la página que ven los clientes, sus platos con fotos y los códigos para imprimir.
-// Las tres partes quedan montadas para no perder lo escrito al cambiar de una a otra.
+// Pestaña "Carta y QR": los platos con sus fotos y los códigos para imprimir (con el logo).
+// La página que ven los clientes tiene un diseño fijo: solo cambian el logo y las fotos de los platos.
+// Las dos partes quedan montadas para no perder lo escrito al cambiar de una a otra.
 export default function CodigosQR({ restaurante }) {
-  const [parte, setParte] = useState('pagina')
+  const [parte, setParte] = useState('platos')
   const [urlPrueba, setUrlPrueba] = useState('')
 
   useEffect(() => {
@@ -353,15 +353,19 @@ export default function CodigosQR({ restaurante }) {
     <div style={{ display: 'grid', gap: 14 }}>
       <div>
         <h2 style={{ margin: 0 }}>Carta y QR</h2>
-        <small className="suave">La página que ven tus clientes al escanear el código. Todo lo editas tú, sin ayuda de nadie.</small>
+        <small className="suave">Tu carta tiene un diseño listo. Tú solo cambias el logo (en «Códigos QR») y las fotos de los platos.</small>
       </div>
+      {urlPrueba && (
+        <a className="btn btn-sec btn-chico" style={{ justifySelf: 'start' }} href={urlPrueba} target="_blank" rel="noreferrer">
+          <Icono n="externo" tam={16} className="it" /> Ver mi carta como cliente
+        </a>
+      )}
       <Segmento
         etiqueta="Sección"
         valor={parte}
         onChange={setParte}
-        opciones={[['pagina', 'Mi página'], ['platos', 'Platos y fotos'], ['qr', 'Códigos QR']]}
+        opciones={[['platos', 'Platos y fotos'], ['qr', 'Códigos QR y logo']]}
       />
-      <div style={{ display: parte === 'pagina' ? 'block' : 'none' }}><EditorCarta restaurante={restaurante} urlPrueba={urlPrueba} /></div>
       <div style={{ display: parte === 'platos' ? 'block' : 'none' }}><PlatosCarta restaurante={restaurante} /></div>
       <div style={{ display: parte === 'qr' ? 'block' : 'none' }}><SeccionQR restaurante={restaurante} /></div>
     </div>
