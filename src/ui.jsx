@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Icono from './iconos'
 import { createPortal } from 'react-dom'
 import { escucharAvisos, movimientoReducido, sentir } from './feedback'
 
 // Duración de abrir/cerrar paneles. Debe coincidir con --dur-panel en index.css.
-export const DUR_PANEL = 320
+export const DUR_PANEL = 220
 
 // ---------------------------------------------------------------------------------------------
 // Desplegable: muestra u oculta contenido creciendo/encogiéndose suave (nunca de golpe).
@@ -13,23 +13,13 @@ export function Desplegable({ abierto, children, className = '', style }) {
   const [montado, setMontado] = useState(abierto)
   const [expandido, setExpandido] = useState(abierto)
   const [suelto, setSuelto] = useState(abierto) // abierto del todo: ya no recorta sombras
+  const caja = useRef(null)
 
+  // Cerrar (y pedir el montaje al abrir).
   useEffect(() => {
     if (abierto) {
       setMontado(true)
-      let r2
-      let t
-      const r1 = requestAnimationFrame(() => {
-        r2 = requestAnimationFrame(() => {
-          setExpandido(true)
-          t = setTimeout(() => setSuelto(true), DUR_PANEL)
-        })
-      })
-      return () => {
-        cancelAnimationFrame(r1)
-        cancelAnimationFrame(r2)
-        clearTimeout(t)
-      }
+      return undefined
     }
     setSuelto(false)
     setExpandido(false)
@@ -37,9 +27,26 @@ export function Desplegable({ abierto, children, className = '', style }) {
     return () => clearTimeout(t)
   }, [abierto])
 
+  // Abrir sin esperar cuadros: el panel se monta cerrado, se fuerza un cálculo de estilos
+  // y se abre antes de pintar, así la animación parte de inmediato.
+  useLayoutEffect(() => {
+    if (!abierto || !montado || expandido) return undefined
+    void caja.current?.offsetHeight
+    setExpandido(true)
+    return undefined
+  }, [abierto, montado, expandido])
+
+  // Ya abierto del todo: deja de recortar sombras y contornos.
+  useEffect(() => {
+    if (!abierto || !expandido) return undefined
+    const t = setTimeout(() => setSuelto(true), DUR_PANEL)
+    return () => clearTimeout(t)
+  }, [abierto, expandido])
+
   if (!montado) return null
   return (
     <div
+      ref={caja}
       className={`desplegable${expandido ? ' abierto' : ''}${suelto ? ' suelto' : ''}`}
       aria-hidden={!abierto || undefined}
     >

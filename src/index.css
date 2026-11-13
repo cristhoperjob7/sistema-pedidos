@@ -44,7 +44,7 @@
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --resorte: cubic-bezier(0.34, 1.56, 0.64, 1);
   --dur: 160ms;
-  --dur-panel: 320ms;
+  --dur-panel: 220ms;
 
   --radio: 14px;
   --seguro-abajo: env(safe-area-inset-bottom, 0px);
