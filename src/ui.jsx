@@ -257,13 +257,13 @@ export function Confirmar({
         aria-modal="true"
         aria-label={titulo}
         onClick={(e) => e.stopPropagation()}
-        style={{ display: 'grid', gap: 12, padding: 20, maxWidth: 420, borderRadius: 24, borderBottom: '1px solid var(--linea)', overflowY: 'auto' }}
+        style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12, padding: 20, maxWidth: 420, width: '100%', boxSizing: 'border-box', borderRadius: 24, borderBottom: '1px solid var(--linea)', overflowY: 'auto' }}
       >
         <b style={{ fontSize: 19, lineHeight: 1.25, color: peligro ? 'var(--rosa-tinta)' : 'var(--tinta)' }}>{titulo}</b>
         {texto && <div className="suave" style={{ fontSize: 15, lineHeight: 1.45 }}>{texto}</div>}
         {children}
         {error && <Mensaje tipo="error">{error}</Mensaje>}
-        <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 4 }}>
           <button className="btn btn-sec" style={{ flex: 1 }} autoFocus disabled={trabajando} onClick={onCancelar}>
             {textoCancelar}
           </button>

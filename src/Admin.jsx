@@ -158,7 +158,7 @@ export default function Admin({ restaurante, scrollAlAbrir = false, conPedidos =
           </div>
         </nav>
 
-        <div style={{ minWidth: 0, display: 'grid', gap: 12 }}>
+        <div style={{ minWidth: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12 }}>
           {/* Pedidos y Cocina quedan siempre montadas (solo se esconden) para que su conexión en vivo
               y el estado del sonido no se reinicien cada vez que se cambia de sección. */}
           {conPedidos && operando && (
