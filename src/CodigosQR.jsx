@@ -62,7 +62,9 @@ function SeccionQR({ restaurante }) {
     }
     setError('')
     setMesas(m.data)
-    setRest(r.data)
+    // El ajuste de autorización existe solo después de paso32: se pide aparte para no romper nada si falta.
+    const ex = await supabase.from('restaurantes').select('qr_exige_autorizacion').eq('id', restaurante.id).single()
+    setRest({ ...r.data, qr_exige_autorizacion: ex.error ? null : ex.data.qr_exige_autorizacion })
     const lista = [
       ...m.data.map((x) => [x.id, urlCarta(r.data.slug, x.qr_token)]),
       ['llevar', urlCarta(r.data.slug, r.data.qr_token_llevar)],
@@ -86,6 +88,17 @@ function SeccionQR({ restaurante }) {
       return
     }
     avisar(valor ? 'Los clientes ya pueden pedir desde el celular' : 'Ahora la carta es solo para mirar', 'info')
+  }
+
+  async function cambiarAutorizacion(valor) {
+    setRest((r) => ({ ...r, qr_exige_autorizacion: valor }))
+    const { error } = await supabase.rpc('config_qr_autorizacion', { p_restaurante: restaurante.id, p_exige: valor })
+    if (error) {
+      setError(error.message.includes('config_qr_autorizacion') ? 'Falta ejecutar paso32.sql en Supabase.' : error.message)
+      cargar()
+      return
+    }
+    avisar(valor ? 'Ahora el local autoriza antes de que pidan' : 'Ya no hace falta autorización para pedir', 'info')
   }
 
   async function desbloquear({ mesa = null, todo = false }) {
@@ -237,6 +250,16 @@ ${hojas
               : 'Apagado: la carta es solo para mirar y llamar a la mesera.'}
           </small>
         </Interruptor>
+        {rest.qr_pedidos && (
+          <Interruptor checked={rest.qr_exige_autorizacion !== false} onChange={cambiarAutorizacion}>
+            <b>Pedir autorización antes de poder pedir</b>
+            <small className="suave" style={{ display: 'block' }}>
+              {rest.qr_exige_autorizacion !== false
+                ? 'El cliente toca «Realizar pedido», la mesera lo autoriza y recién ahí puede armar su pedido. Luego tú apruebas o rechazas lo que pida.'
+                : 'Apagado: el cliente puede armar su pedido de inmediato (igual lo apruebas tú antes de que llegue a cocina).'}
+            </small>
+          </Interruptor>
+        )}
         {hayBloqueos && (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '10px 12px', borderRadius: 12, background: 'var(--durazno)', border: '1px solid var(--borde-aviso)', color: 'var(--aviso-tinta)' }}>
             <span style={{ flex: 1, minWidth: 180 }}><Icono n="candado" tam={15} className="it" /> Hay {nBloqueos} {nBloqueos === 1 ? 'código bloqueado' : 'códigos bloqueados'} por pedidos molestos.</span>

@@ -18,6 +18,7 @@ export default function AvisosQR({ restaurante }) {
   const $ = (v) => formatear(v, restaurante)
   const [pedidos, setPedidos] = useState([])
   const [llamados, setLlamados] = useState([])
+  const [permisos, setPermisos] = useState([]) // mesas que piden autorización para pedir desde el celular
   const [error, setError] = useState('')
   const [ocupado, setOcupado] = useState(null) // id que se está resolviendo
   const [rechazando, setRechazando] = useState(null)
@@ -30,7 +31,7 @@ export default function AvisosQR({ restaurante }) {
   const cargar = useCallback(async () => {
     const rid = restaurante.id
     const desde = new Date(Date.now() - MIN_VENCE * 60000).toISOString()
-    const [p, l] = await Promise.all([
+    const [p, l, a] = await Promise.all([
       supabase
         .from('pedidos_qr')
         .select('*, mesas(numero, nombre)')
@@ -45,9 +46,17 @@ export default function AvisosQR({ restaurante }) {
         .is('atendido_en', null)
         .gt('creado_en', new Date(Date.now() - 2 * 3600000).toISOString())
         .order('creado_en'),
+      supabase
+        .from('autorizaciones_qr')
+        .select('*, mesas(numero, nombre)')
+        .eq('restaurante_id', rid)
+        .eq('estado', 'pendiente')
+        .gt('creado_en', new Date(Date.now() - 30 * 60000).toISOString())
+        .order('creado_en'),
     ])
     if (p.error || l.error) return // tablas aún sin crear (paso22): no se muestra nada
-    const ids = new Set([...(p.data ?? []).map((x) => x.id), ...(l.data ?? []).map((x) => x.id)])
+    const pedidosAut = a.error ? [] : a.data ?? [] // sin paso32 todavía: simplemente no hay solicitudes
+    const ids = new Set([...(p.data ?? []).map((x) => x.id), ...(l.data ?? []).map((x) => x.id), ...pedidosAut.map((x) => x.id)])
     if (vistos.current) {
       const nuevo = [...ids].some((id) => !vistos.current.has(id))
       if (nuevo) {
@@ -58,6 +67,7 @@ export default function AvisosQR({ restaurante }) {
     vistos.current = ids
     setPedidos(p.data ?? [])
     setLlamados(l.data ?? [])
+    setPermisos(pedidosAut)
   }, [restaurante.id])
 
   useEffect(() => {
@@ -71,6 +81,7 @@ export default function AvisosQR({ restaurante }) {
       .channel(`qr-${restaurante.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos_qr', filter: filtro }, programar)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'llamados_mesa', filter: filtro }, programar)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'autorizaciones_qr', filter: filtro }, programar)
       .subscribe()
     const minuto = setInterval(() => {
       reloj((n) => n + 1) // actualiza los "hace X min"
@@ -121,6 +132,21 @@ export default function AvisosQR({ restaurante }) {
     cargar()
   }
 
+  async function resolverPermiso(a, autorizar) {
+    setOcupado(a.id)
+    setError('')
+    const { error } = await supabase.rpc('resolver_autorizacion_qr', { p_id: a.id, p_autorizar: autorizar })
+    setOcupado(null)
+    if (error) {
+      setError(error.message)
+      cargar()
+      return
+    }
+    sentir('toque', autorizar ? 'exito' : 'toque')
+    avisar(autorizar ? 'Mesa autorizada: ya puede armar su pedido' : 'Solicitud rechazada', autorizar ? 'ok' : 'info')
+    cargar()
+  }
+
   async function atender(l) {
     setOcupado(l.id)
     const { error } = await supabase.rpc('atender_llamado', { p_id: l.id })
@@ -130,7 +156,7 @@ export default function AvisosQR({ restaurante }) {
     cargar()
   }
 
-  if (pedidos.length === 0 && llamados.length === 0 && !error) return null
+  if (pedidos.length === 0 && llamados.length === 0 && permisos.length === 0 && !error) return null
 
   const nombreMesa = (x) =>
     x.mesa_id ? `Mesa ${x.mesas?.numero ?? '?'}${x.mesas?.nombre ? ` · ${x.mesas.nombre}` : ''}` : <><Icono n="bolsa" tam={15} className="it" /> Para llevar · {x.cliente ?? ''}</>
@@ -150,6 +176,24 @@ export default function AvisosQR({ restaurante }) {
           <button className="btn btn-chico btn-sec" disabled={ocupado === l.id} onClick={() => atender(l)}>
             Atendido
           </button>
+        </div>
+      ))}
+
+      {permisos.map((a) => (
+        <div key={a.id} className="tarjeta" style={{ padding: 12, display: 'grid', gap: 8, borderColor: 'var(--borde-aviso)' }}>
+          <div style={s.fila}>
+            <b><Icono n="orden" tam={15} className="it" /> {nombreMesa(a)} quiere hacer un pedido</b>
+            <small className="suave">{hace(a.creado_en)}</small>
+          </div>
+          <small className="suave">Si la autorizas, podrá armar su pedido desde el celular. Después tú apruebas lo que pida.</small>
+          <span style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button className="btn btn-chico btn-sec" disabled={ocupado === a.id} onClick={() => resolverPermiso(a, false)}>
+              Rechazar
+            </button>
+            <button className="btn btn-chico btn-principal" disabled={ocupado === a.id} onClick={() => resolverPermiso(a, true)}>
+              {ocupado === a.id ? <span className="puntos">Autorizando</span> : 'Autorizar'}
+            </button>
+          </span>
         </div>
       ))}
 

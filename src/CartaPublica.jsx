@@ -32,6 +32,30 @@ const leer = (k) => {
   }
 }
 
+// Identifica este celular (solo importa en los pedidos para llevar, donde varios clientes comparten el mismo QR).
+function claveCelular() {
+  let c = leer('qr-clave')
+  if (!c) {
+    const azar = () => Math.random().toString(36).slice(2)
+    c = (globalThis.crypto?.randomUUID?.() ?? azar() + azar() + Date.now().toString(36)).replace(/-/g, '')
+    guardar('qr-clave', c)
+  }
+  return c.slice(0, 64)
+}
+
+// Imagen de portada de cada categoría: la foto de uno de sus platos (los destacados primero). Si no hay, se dibuja una tarjeta de color.
+function portadaDe(c) {
+  const conFoto = c.productos.filter((p) => fotoOk(p.foto))
+  return (conFoto.find((p) => p.destacado) ?? conFoto[0])?.foto ?? null
+}
+function iconoDe(c) {
+  const t = String(c.nombre ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  if (c.tipo === 'bebida' || /bebida|jugo|cerveza|trago|vino|cafe/.test(t)) return 'bebida'
+  if (c.tipo === 'postre' || /postre|dulce|helado|torta/.test(t)) return 'postre'
+  if (/llevar|envase|extra/.test(t)) return 'bolsa'
+  return 'cubiertos'
+}
+
 // Lo que ve el cliente al escanear el QR de su mesa: la carta, un carrito, y avisos a la mesera.
 // Sin sesión: todo pasa por funciones públicas del servidor. Los precios los pone siempre el servidor.
 export default function CartaPublica({ slug, token }) {
@@ -47,12 +71,17 @@ export default function CartaPublica({ slug, token }) {
   const [estado, setEstado] = useState(null) // { estado, motivo } del pedido enviado
   const [aviso, setAviso] = useState('')
   const [enfriando, setEnfriando] = useState(false)
-  const [catActiva, setCatActiva] = useState(null)
+  const [vistaCat, setVistaCat] = useState(null) // categoría abierta (null = se ven las tarjetas)
+  const [buscando, setBuscando] = useState(false)
+  const [consulta, setConsulta] = useState('')
+  const [aut, setAut] = useState(null) // { exige, estado: ninguna | pendiente | autorizada | rechazada, motivo }
+  const [pidiendo, setPidiendo] = useState(false)
+  const [avisoAut, setAvisoAut] = useState('')
+  const [clave] = useState(claveCelular)
   const [zoom, setZoom] = useState(null)
   const [mesaEstado, setMesaEstado] = useState({ cuenta_abierta: false, cuenta_pedida: false, qr_bloqueado: false })
   const [finalizada, setFinalizada] = useState(() => leer('qr-fin-' + token) === '1')
   const vioCuenta = useRef(false) // ¿se vio la cuenta abierta desde este celular?
-  const refs = useRef({})
 
   const cargar = useCallback(async () => {
     const { data, error } = await supabase.rpc('carta_publica', { p_slug: slug, p_token: token })
@@ -141,35 +170,53 @@ export default function CartaPublica({ slug, token }) {
     }
   }, [pedidoId])
 
-  // Resalta en la barra la categoría que se está leyendo (la última cuyo encabezado ya pasó bajo la barra).
+  // ¿El local ya autorizó a esta mesa a pedir? Mientras espera, se consulta cada pocos segundos.
+  const estadoAut = aut?.estado
   useEffect(() => {
-    if (!carta?.categorias?.length) return
-    let pendiente = false
-    const medir = () => {
-      pendiente = false
-      let activa = null
-      for (const c of carta.categorias) {
-        const el = document.getElementById(`cat-${c.id}`)
-        if (el && el.getBoundingClientRect().top <= 180) activa = c.id
+    if (!carta?.puede_pedir) return
+    let vivo = true
+    const consultar = async () => {
+      if (document.visibilityState !== 'visible') return
+      const { data, error } = await supabase.rpc('estado_autorizacion_qr', { p_slug: slug, p_token: token, p_clave: clave })
+      if (!vivo) return
+      if (error) {
+        // Aún sin ejecutar paso32: el local funciona como antes (sin autorización previa).
+        if (/estado_autorizacion_qr|schema cache|could not find/i.test(error.message ?? '')) setAut({ exige: false, estado: 'autorizada' })
+        return
       }
-      // Al llegar al final de la página, queda marcada la última categoría.
-      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 6) activa = carta.categorias[carta.categorias.length - 1].id
-      setCatActiva(activa ?? carta.categorias[0].id)
+      if (data) setAut(data)
     }
-    const alMover = () => {
-      if (!pendiente) {
-        pendiente = true
-        requestAnimationFrame(medir)
-      }
-    }
-    medir()
-    window.addEventListener('scroll', alMover, { passive: true })
-    window.addEventListener('resize', alMover)
+    consultar()
+    const t = setInterval(consultar, estadoAut === 'pendiente' ? 3000 : 8000)
+    document.addEventListener('visibilitychange', consultar)
     return () => {
-      window.removeEventListener('scroll', alMover)
-      window.removeEventListener('resize', alMover)
+      vivo = false
+      clearInterval(t)
+      document.removeEventListener('visibilitychange', consultar)
     }
-  }, [carta?.categorias])
+  }, [!!carta, carta?.puede_pedir, slug, token, clave, estadoAut])
+
+  // Al abrir o cerrar una categoría, la pantalla vuelve al inicio de la carta.
+  const primeraVez = useRef(true)
+  useEffect(() => {
+    if (primeraVez.current) {
+      primeraVez.current = false
+      return
+    }
+    document.getElementById('carta')?.scrollIntoView({ block: 'start' })
+  }, [vistaCat])
+
+  useEffect(() => {
+    if (!buscando) return
+    const previo = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const alTeclear = (e) => e.key === 'Escape' && setBuscando(false)
+    window.addEventListener('keydown', alTeclear)
+    return () => {
+      document.body.style.overflow = previo
+      window.removeEventListener('keydown', alTeclear)
+    }
+  }, [buscando])
 
   const rest = carta?.restaurante
   const $ = (v) => formatear(v, rest ?? { moneda_simbolo: '$', moneda_decimales: 0 })
@@ -201,6 +248,7 @@ export default function CartaPublica({ slug, token }) {
       p_token: token,
       p_items: lineas.map((l) => ({ producto_id: l.id, cantidad: l.n, nota: l.nota })),
       p_cliente: cliente,
+      ...(aut?.exige ? { p_clave: clave } : {}),
     })
     setEnviando(false)
     if (error) {
@@ -212,6 +260,19 @@ export default function CartaPublica({ slug, token }) {
     setEstado({ estado: 'pendiente' })
     setPedidoId(data.id)
     setVerPedido(false)
+  }
+
+  async function solicitar() {
+    if (pidiendo) return
+    setPidiendo(true)
+    setAvisoAut('')
+    const { data, error } = await supabase.rpc('solicitar_autorizacion_qr', { p_slug: slug, p_token: token, p_clave: clave })
+    setPidiendo(false)
+    if (error) {
+      setAvisoAut(error.message)
+      return
+    }
+    if (data) setAut(data)
   }
 
   function otroPedido() {
@@ -238,11 +299,6 @@ export default function CartaPublica({ slug, token }) {
           : 'Listo, ya avisamos a la mesera.'
     )
     setTimeout(() => setAviso(''), 7000)
-  }
-
-  function irA(id) {
-    setCatActiva(id)
-    refs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   if (error) {
@@ -340,6 +396,49 @@ export default function CartaPublica({ slug, token }) {
 
   const irCarta = () => document.getElementById('carta')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
+  // Autorización previa del local: sin ella se ve la carta, pero no se puede agregar nada.
+  const necesitaAut = puedePedir && !!aut?.exige && aut.estado !== 'autorizada'
+  const puedeAgregar = puedePedir && !!aut && !necesitaAut
+  const esperando = necesitaAut && aut.estado === 'pendiente'
+  const catAbierta = carta.categorias.find((c) => c.id === vistaCat) ?? null
+  const q = String(consulta).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+  const resultados = q
+    ? carta.categorias
+        .flatMap((c) => c.productos.map((p) => ({ p, cat: c.nombre })))
+        .filter(({ p }) => String(p.nombre).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes(q))
+        .slice(0, 40)
+    : []
+
+  // Una fila de plato (la misma en la categoría y en los resultados de la búsqueda).
+  const plato = (p, etiqueta = null) => {
+    const n = cant[p.id] ?? 0
+    return (
+      <article key={p.id} className={`cp-plato${p.agotado ? ' agotado' : ''}`}>
+        <div className="cp-plato-txt">
+          {p.destacado && !p.agotado ? <span className="cp-star"><Icono n="estrella" tam={15} className="it" /> Destacado</span> : null}
+          <h4>{p.nombre}</h4>
+          {etiqueta ? <small className="cp-suave" style={{ margin: 0 }}>{etiqueta}</small> : null}
+          {p.descripcion ? <p>{p.descripcion}</p> : null}
+        </div>
+        {fotoOk(p.foto) && <img className="cp-foto" src={p.foto} alt={p.nombre} loading="lazy" decoding="async" />}
+        <div className="cp-plato-pie">
+          <b>{p.agotado ? 'Agotado por hoy' : $(p.precio)}</b>
+          {puedeAgregar && !p.agotado && (
+            n === 0 ? (
+              <button className="cp-add" onClick={() => cambiar(p.id, 1)} aria-label={`Agregar ${p.nombre}`}>Agregar</button>
+            ) : (
+              <div className="cp-paso">
+                <button onClick={() => cambiar(p.id, -1)} aria-label={`Quitar uno de ${p.nombre}`}><Icono n="menos" tam={18} ancho={2.4} /></button>
+                <b>{n}</b>
+                <button onClick={() => cambiar(p.id, 1)} aria-label={`Agregar otro ${p.nombre}`}><Icono n="mas" tam={18} ancho={2.4} /></button>
+              </div>
+            )
+          )}
+        </div>
+      </article>
+    )
+  }
+
   return (
     <div className="cp">
       <style>{CSS}</style>
@@ -365,6 +464,11 @@ export default function CartaPublica({ slug, token }) {
           <span className="cp-pill">{rotulo}</span>
           <div className="cp-cta">
             <button className="cp-boton cp-boton-fuerte" onClick={irCarta}>Ver la carta</button>
+            {necesitaAut && (
+              <button className="cp-boton" disabled={pidiendo || esperando} onClick={solicitar}>
+                {esperando ? <><Icono n="arena" tam={15} className="it" /> Esperando autorización…</> : <><Icono n="orden" tam={15} className="it" /> Realizar pedido</>}
+              </button>
+            )}
             {!carta.llevar && (
               <>
                 <button className="cp-boton" disabled={enfriando} onClick={() => llamar('mesera')}><Icono n="timbre" tam={15} className="it" /> Llamar a la mesera</button>
@@ -400,61 +504,74 @@ export default function CartaPublica({ slug, token }) {
       {/* CARTA */}
       <section id="carta" className="cp-seccion">
         <div className="cp-wrap">
-          <h2 className="cp-titulo">Nuestra carta</h2>
+          <div className="cp-carta-cab">
+            <h2 className="cp-titulo" style={{ margin: 0 }}>Nuestra carta</h2>
+            {carta.categorias.length > 0 && (
+              <button className="cp-lupa" aria-label="Buscar un plato" onClick={() => { setConsulta(''); setBuscando(true) }}>
+                <Icono n="buscar" tam={20} />
+              </button>
+            )}
+          </div>
           {bloqueado ? (
             <p className="cp-suave" role="status">Los pedidos desde el celular están pausados {carta.llevar ? 'por ahora' : 'en esta mesa'}. Pídele ayuda a la mesera.</p>
           ) : !puedePedir ? (
             <p className="cp-suave">Mira la carta con calma y pídele a la mesera lo que quieras.</p>
           ) : null}
-        </div>
-        {carta.categorias.length > 1 && (
-          <nav className="cp-nav" aria-label="Categorías">
-            <div className="cp-wrap cp-nav-in">
-              {carta.categorias.map((c) => (
-                <button key={c.id} className={catActiva === c.id ? 'on' : ''} onClick={() => irA(c.id)}>{c.nombre}</button>
-              ))}
+          {necesitaAut && (
+            <div className={`cp-aut${esperando ? ' espera' : ''}`} role="status">
+              {esperando ? (
+                <><Icono n="arena" tam={18} className="it" /> <span><b>Esperando autorización del local.</b> Puedes ir mirando la carta; apenas te autoricen podrás agregar tus platos.</span></>
+              ) : aut.estado === 'rechazada' ? (
+                <><Icono n="alerta" tam={18} className="it" /> <span><b>No pudimos autorizar tu pedido.</b> {aut.motivo || 'Habla con la mesera y te ayuda enseguida.'}</span></>
+              ) : (
+                <><Icono n="orden" tam={18} className="it" /> <span>Para pedir desde el celular, toca <b>Realizar pedido</b>. El local te autoriza y ahí eliges tus platos.</span></>
+              )}
             </div>
-          </nav>
-        )}
+          )}
+          {puedeAgregar && aut?.exige && (
+            <div className="cp-aut ok" role="status"><Icono n="circulocheck" tam={18} className="it" /> <span><b>El local autorizó tu pedido.</b> Agrega tus platos con el botón «Agregar».</span></div>
+          )}
+          {avisoAut && <div className="cp-aut" role="alert"><Icono n="alerta" tam={18} className="it" /> <span>{avisoAut}</span></div>}
+        </div>
+
         <div className="cp-wrap">
           {carta.categorias.length === 0 && <p className="cp-suave">Aún no hay productos en la carta.</p>}
-          {carta.categorias.map((c) => (
-            <div key={c.id} id={`cat-${c.id}`} ref={(el) => (refs.current[c.id] = el)} className="cp-cat">
-              <div className="cp-cat-cab">
-                <h3 className="cp-cat-t">{c.nombre}</h3>
-                <span className="cp-cat-n">{c.productos.length} {c.productos.length === 1 ? 'opción' : 'opciones'}</span>
-              </div>
-              <div className="cp-cat-lista">
-              {c.productos.map((p) => {
-                const n = cant[p.id] ?? 0
+
+          {!catAbierta && carta.categorias.length > 0 && (
+            <div className="cp-cats">
+              {carta.categorias.map((c, i) => {
+                const foto = portadaDe(c)
                 return (
-                  <article key={p.id} className={`cp-plato${p.agotado ? ' agotado' : ''}`}>
-                    <div className="cp-plato-txt">
-                      {p.destacado && !p.agotado ? <span className="cp-star"><Icono n="estrella" tam={15} className="it" /> Destacado</span> : null}
-                      <h4>{p.nombre}</h4>
-                      {p.descripcion ? <p>{p.descripcion}</p> : null}
-                    </div>
-                    {fotoOk(p.foto) && <img className="cp-foto" src={p.foto} alt={p.nombre} loading="lazy" decoding="async" />}
-                    <div className="cp-plato-pie">
-                        <b>{p.agotado ? 'Agotado por hoy' : $(p.precio)}</b>
-                        {puedePedir && !p.agotado && (
-                          n === 0 ? (
-                            <button className="cp-add" onClick={() => cambiar(p.id, 1)} aria-label={`Agregar ${p.nombre}`}>Agregar</button>
-                          ) : (
-                            <div className="cp-paso">
-                              <button onClick={() => cambiar(p.id, -1)} aria-label={`Quitar uno de ${p.nombre}`}><Icono n="menos" tam={18} ancho={2.4} /></button>
-                              <b>{n}</b>
-                              <button onClick={() => cambiar(p.id, 1)} aria-label={`Agregar otro ${p.nombre}`}><Icono n="mas" tam={18} ancho={2.4} /></button>
-                            </div>
-                          )
-                        )}
-                      </div>
-                  </article>
+                  <button key={c.id} className={`cp-cat-card${foto ? '' : ' sin-foto'} v${i % 5}`} onClick={() => setVistaCat(c.id)} aria-label={`Ver ${c.nombre}`}>
+                    {foto ? (
+                      <img src={foto} alt="" loading="lazy" decoding="async" />
+                    ) : (
+                      <span className="cp-cat-ic" aria-hidden="true"><Icono n={iconoDe(c)} tam={120} ancho={1.1} /></span>
+                    )}
+                    <span className="cp-cat-vel" />
+                    <span className="cp-cat-txt">
+                      <b>{c.nombre}</b>
+                      <small>{c.productos.length} {c.productos.length === 1 ? 'opción' : 'opciones'}</small>
+                    </span>
+                  </button>
                 )
               })}
-                          </div>
             </div>
-          ))}
+          )}
+
+          {catAbierta && (
+            <div className="cp-cat">
+              <div className="cp-cat-cab">
+                <button className="cp-volver" onClick={() => setVistaCat(null)} aria-label="Volver a las categorías"><Icono n="atras" tam={18} ancho={2.4} /></button>
+                <h3 className="cp-cat-t">{catAbierta.nombre}</h3>
+                <span className="cp-cat-n">{catAbierta.productos.length} {catAbierta.productos.length === 1 ? 'opción' : 'opciones'}</span>
+              </div>
+              <div className="cp-cat-lista">{catAbierta.productos.map((p) => plato(p))}</div>
+            </div>
+          )}
+          {catAbierta && (
+            <button className="cp-sec-boton" onClick={() => setVistaCat(null)}>Ver todas las categorías</button>
+          )}
         </div>
       </section>
 
@@ -514,13 +631,55 @@ export default function CartaPublica({ slug, token }) {
 
       <footer className="cp-pie">{rest.nombre}</footer>
 
-      {puedePedir && unidades > 0 && (
+      {puedePedir && aut && (necesitaAut || unidades > 0 || aut.exige) && (
         <div className="cp-barra">
-          <button onClick={() => setVerPedido(true)}>
-            <span>Ver mi pedido ({unidades})</span>
-            <b>{$(total)}</b>
-          </button>
+          {necesitaAut ? (
+            <button disabled={pidiendo || esperando} onClick={solicitar}>
+              {esperando ? (
+                <span><Icono n="arena" tam={18} className="it" /> Espera autorización del local…</span>
+              ) : (
+                <span>{pidiendo ? <span className="puntos">Enviando</span> : <><Icono n="orden" tam={18} className="it" /> Realizar pedido</>}</span>
+              )}
+            </button>
+          ) : unidades > 0 ? (
+            <button onClick={() => setVerPedido(true)}>
+              <span>Ver mi pedido ({unidades})</span>
+              <b>{$(total)}</b>
+            </button>
+          ) : (
+            <div className="cp-barra-ok"><Icono n="circulocheck" tam={18} className="it" /> Pedido autorizado · elige tus platos</div>
+          )}
         </div>
+      )}
+
+      {buscando && createPortal(
+        <div className="cp-buscar-velo" onClick={() => setBuscando(false)}>
+          <div className="cp-buscar" role="dialog" aria-modal="true" aria-label="Buscar un plato" onClick={(e) => e.stopPropagation()}>
+            <div className="cp-buscar-cab">
+              <Icono n="buscar" tam={20} />
+              <input
+                className="campo-chico"
+                autoFocus
+                autoComplete="off"
+                maxLength={60}
+                placeholder="Escribe el nombre del plato"
+                value={consulta}
+                onChange={(e) => setConsulta(e.target.value)}
+              />
+              <button className="cp-buscar-x" aria-label="Cerrar la búsqueda" onClick={() => setBuscando(false)}><Icono n="cerrar" tam={18} /></button>
+            </div>
+            <div className="cp-buscar-res">
+              {!q && <small className="cp-suave">Escribe parte del nombre, con o sin tildes.</small>}
+              {q && resultados.length === 0 && <small className="cp-suave">No hay platos con ese nombre.</small>}
+              {necesitaAut && resultados.length > 0 && <small className="cp-suave">Para agregar platos, primero toca «Realizar pedido» y espera la autorización del local.</small>}
+              {resultados.map(({ p, cat }) => plato(p, cat))}
+            </div>
+            {resultados.length > 0 && puedeAgregar && unidades > 0 && (
+              <button className="cp-sec-boton fuerte" onClick={() => setBuscando(false)}>Listo · ver mi pedido ({unidades})</button>
+            )}
+          </div>
+        </div>,
+        document.body
       )}
 
       {zoom && createPortal(
@@ -619,6 +778,43 @@ const CSS = `
 .cp-novedad div{padding:14px 16px}
 .cp-novedad h3{margin:0 0 4px;font-size:18px}
 .cp-novedad p{margin:0;color:var(--suave);line-height:1.45;white-space:pre-line}
+.cp-carta-cab{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.cp-lupa{all:unset;cursor:pointer;box-sizing:border-box;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:var(--marca);color:var(--sobre-marca)}
+.cp-lupa:active{transform:scale(.94)}
+.cp-aut{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:16px;margin:0 0 12px;background:var(--durazno);border:1px solid var(--borde-aviso);color:var(--aviso-tinta);font-size:14px;line-height:1.4}
+.cp-aut.ok{background:var(--menta);border-color:var(--borde-menta);color:var(--menta-tinta)}
+.cp-aut.espera{background:color-mix(in srgb,var(--marca) 14%,var(--sup));border-color:color-mix(in srgb,var(--marca) 45%,var(--linea));color:var(--tinta)}
+.cp-aut .it{flex:none;margin-top:2px}
+.cp-cats{display:grid;gap:14px;margin-top:6px}
+.cp-cat-card{all:unset;box-sizing:border-box;cursor:pointer;position:relative;display:grid;place-items:center;min-height:150px;border-radius:30px;overflow:hidden;color:#fff;isolation:isolate;box-shadow:0 10px 26px -16px rgba(0,0,0,.55);transition:transform .18s}
+.cp-cat-card:active{transform:scale(.985)}
+.cp-cat-card>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2}
+.cp-cat-vel{position:absolute;inset:0;z-index:-1;background:rgba(0,0,0,.38)}
+.cp-cat-card.sin-foto{background:linear-gradient(135deg,color-mix(in srgb,var(--marca) 78%,#000),color-mix(in srgb,var(--marca) 38%,#000))}
+.cp-cat-card.sin-foto.v1{background:linear-gradient(135deg,#7a3b2e,#c0694a)}
+.cp-cat-card.sin-foto.v2{background:linear-gradient(135deg,#2f5d50,#5e9c85)}
+.cp-cat-card.sin-foto.v3{background:linear-gradient(135deg,#4a3b6b,#8c76c2)}
+.cp-cat-card.sin-foto.v4{background:linear-gradient(135deg,#6b5a2a,#c2a24d)}
+.cp-cat-card.sin-foto .cp-cat-vel{background:rgba(0,0,0,.12)}
+.cp-cat-ic{position:absolute;right:-14px;bottom:-22px;z-index:-1;opacity:.22;color:#fff;transform:rotate(-12deg)}
+.cp-cat-txt{display:grid;gap:4px;justify-items:center;text-align:center;padding:18px 20px}
+.cp-cat-txt b{font-size:clamp(22px,6.4vw,30px);line-height:1.12;letter-spacing:1.5px;text-transform:uppercase;font-weight:600;text-shadow:0 2px 12px rgba(0,0,0,.5);overflow-wrap:anywhere}
+.cp-cat-txt small{font-size:13px;font-weight:700;letter-spacing:.3px;opacity:.92;text-shadow:0 1px 8px rgba(0,0,0,.5)}
+@media(min-width:620px){.cp-cats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.cp-volver{all:unset;cursor:pointer;flex:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:var(--sup);border:1px solid var(--linea);color:var(--tinta)}
+.cp-cat-cab{align-items:center}
+.cp-cat-cab .cp-cat-t{flex:1;min-width:0;overflow-wrap:anywhere}
+.cp-sec-boton{all:unset;box-sizing:border-box;cursor:pointer;display:block;width:100%;margin-top:14px;padding:13px 18px;text-align:center;border-radius:16px;border:1px solid var(--linea);background:var(--sup);font-weight:800;font-size:15px}
+.cp-sec-boton.fuerte{background:var(--marca);border-color:var(--marca);color:var(--sobre-marca)}
+.cp-barra button:disabled{opacity:.8;cursor:default}
+.cp-barra-ok{display:flex;gap:8px;align-items:center;justify-content:center;padding:14px 18px;border-radius:16px;background:var(--menta);border:1px solid var(--borde-menta);color:var(--menta-tinta);font-weight:800;font-size:15px}
+.cp-buscar-velo{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.5);display:flex;align-items:flex-start;justify-content:center;padding:12vh 14px 14px}
+.cp-buscar{width:100%;max-width:520px;max-height:78vh;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;gap:10px;background:var(--fondo);color:var(--tinta);border-radius:22px;padding:14px;box-shadow:0 24px 60px -20px rgba(0,0,0,.6)}
+.cp-buscar-cab{display:flex;gap:10px;align-items:center}
+.cp-buscar-cab .campo-chico{flex:1;min-width:0}
+.cp-buscar-x{all:unset;cursor:pointer;flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--sup);border:1px solid var(--linea)}
+.cp-buscar-res{overflow-y:auto;overflow-x:hidden;min-height:60px;display:grid;grid-template-columns:minmax(0,1fr);align-content:start}
+.cp-buscar-res .cp-plato{padding:14px 0}
 .cp-nav{position:sticky;top:0;padding-top:env(safe-area-inset-top,0px);z-index:20;box-shadow:0 6px 14px -12px rgba(0,0,0,.6);background:color-mix(in srgb,var(--fondo) 92%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--linea);margin:6px 0 4px}
 .cp-nav-in{display:flex;gap:8px;overflow-x:auto;padding-top:10px;padding-bottom:10px;scrollbar-width:none}
 .cp-nav-in::-webkit-scrollbar{display:none}
