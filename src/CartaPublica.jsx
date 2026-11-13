@@ -77,6 +77,8 @@ export default function CartaPublica({ slug, token }) {
   const [aut, setAut] = useState(null) // { exige, estado: ninguna | pendiente | autorizada | rechazada, motivo }
   const [pidiendo, setPidiendo] = useState(false)
   const [avisoAut, setAvisoAut] = useState('')
+  const [rechOculta, setRechOculta] = useState(null) // aviso de rechazo que el cliente ya cerró (o que se escondió solo)
+  const [detalle, setDetalle] = useState(null) // { p, cat }: ficha de un plato
   const [clave] = useState(claveCelular)
   const [zoom, setZoom] = useState(null)
   const [mesaEstado, setMesaEstado] = useState({ cuenta_abierta: false, cuenta_pedida: false, qr_bloqueado: false })
@@ -146,6 +148,13 @@ export default function CartaPublica({ slug, token }) {
       setCant({})
       setNotas({})
       setVerPedido(false)
+      // La visita terminó: se olvida la autorización (y cualquier aviso de rechazo) de esa visita.
+      setAut(null)
+      setAvisoAut('')
+      setRechOculta(null)
+      setVistaCat(null)
+      setDetalle(null)
+      setBuscando(false)
     }
   }, [mesaEstado.cuenta_abierta, carta?.llevar, !!carta])
 
@@ -205,6 +214,27 @@ export default function CartaPublica({ slug, token }) {
     }
     document.getElementById('carta')?.scrollIntoView({ block: 'start' })
   }, [vistaCat])
+
+  // El aviso «No pudimos autorizar tu pedido» se puede cerrar con la X y, si no, se esconde solo a los 20 segundos.
+  const claveRech = aut?.estado === 'rechazada' ? String(aut.id ?? aut.motivo ?? 'rechazada') : null
+  useEffect(() => {
+    if (!claveRech) return
+    const t = setTimeout(() => setRechOculta(claveRech), 20000)
+    return () => clearTimeout(t)
+  }, [claveRech])
+
+  useEffect(() => {
+    if (!avisoAut) return
+    const t = setTimeout(() => setAvisoAut(''), 12000)
+    return () => clearTimeout(t)
+  }, [avisoAut])
+
+  useEffect(() => {
+    if (!detalle) return
+    const alTeclear = (e) => e.key === 'Escape' && setDetalle(null)
+    window.addEventListener('keydown', alTeclear)
+    return () => window.removeEventListener('keydown', alTeclear)
+  }, [detalle])
 
   useEffect(() => {
     if (!buscando) return
@@ -409,33 +439,102 @@ export default function CartaPublica({ slug, token }) {
         .slice(0, 40)
     : []
 
-  // Una fila de plato (la misma en la categoría y en los resultados de la búsqueda).
-  const plato = (p, etiqueta = null) => {
+  // Color de respaldo (cuando un plato no tiene foto): el mismo tono de la tarjeta de su categoría.
+  const tono = (cat) => Math.max(0, carta.categorias.findIndex((c) => c.id === cat?.id)) % 5
+  const catDe = (p) => carta.categorias.find((c) => c.productos.some((x) => x.id === p.id)) ?? null
+
+  // Foto del plato, o un recuadro de color con un ícono si no tiene.
+  const media = (p, cat, clase, tamIc = 34) =>
+    fotoOk(p.foto) ? (
+      <img className={clase} src={p.foto} alt="" loading="lazy" decoding="async" />
+    ) : (
+      <span className={`${clase} cp-ph v${tono(cat)}`} aria-hidden="true"><Icono n={iconoDe(cat ?? {})} tam={tamIc} ancho={1.4} /></span>
+    )
+
+  // Botón + (o − n +) para pedir. Solo aparece cuando el local ya autorizó.
+  const control = (p) => {
+    if (!puedeAgregar || p.agotado) return null
     const n = cant[p.id] ?? 0
+    return n === 0 ? (
+      <button className="cp-mas" onClick={() => cambiar(p.id, 1)} aria-label={`Agregar ${p.nombre}`}><Icono n="mas" tam={20} ancho={2.4} /></button>
+    ) : (
+      <div className="cp-paso">
+        <button onClick={() => cambiar(p.id, -1)} aria-label={`Quitar uno de ${p.nombre}`}><Icono n="menos" tam={18} ancho={2.4} /></button>
+        <b aria-live="polite">{n}</b>
+        <button onClick={() => cambiar(p.id, 1)} aria-label={`Agregar otro ${p.nombre}`}><Icono n="mas" tam={18} ancho={2.4} /></button>
+      </div>
+    )
+  }
+
+  // Lista rápida (cuando ya puede pedir, y en la búsqueda): foto chica, nombre, precio y el botón +.
+  const fila = (p, cat, etiqueta = null) => (
+    <div key={p.id} className={`cp-fila${p.agotado ? ' agotado' : ''}`}>
+      <button className="cp-fila-info" onClick={() => setDetalle({ p, cat })} aria-label={`Ver detalle de ${p.nombre}`}>
+        {media(p, cat, 'cp-fila-media', 22)}
+        <span className="cp-fila-txt">
+          <b>{p.nombre}</b>
+          {etiqueta ? <small>{etiqueta}</small> : null}
+          <span className="cp-fila-pr">{p.agotado ? 'Agotado por hoy' : $(p.precio)}</span>
+        </span>
+      </button>
+      {control(p)}
+    </div>
+  )
+
+  // Vista elegante de una categoría (antes de que el local autorice): portada, plato destacado y grilla.
+  const vitrina = (cat) => {
+    const prods = cat.productos
+    const disponibles = prods.filter((p) => !p.agotado)
+    const dest = disponibles.find((p) => p.destacado) ?? disponibles.find((p) => fotoOk(p.foto)) ?? null
+    const resto = prods.filter((p) => p !== dest)
+    const portada = portadaDe(cat)
     return (
-      <article key={p.id} className={`cp-plato${p.agotado ? ' agotado' : ''}`}>
-        <div className="cp-plato-txt">
-          {p.destacado && !p.agotado ? <span className="cp-star"><Icono n="estrella" tam={15} className="it" /> Destacado</span> : null}
-          <h4>{p.nombre}</h4>
-          {etiqueta ? <small className="cp-suave" style={{ margin: 0 }}>{etiqueta}</small> : null}
-          {p.descripcion ? <p>{p.descripcion}</p> : null}
+      <div className="cp-vit">
+        <div className={`cp-vit-hero${portada ? '' : ` sin-foto v${tono(cat)}`}`}>
+          {portada ? <img src={portada} alt="" decoding="async" /> : <span className="cp-cat-ic" aria-hidden="true"><Icono n={iconoDe(cat)} tam={130} ancho={1.1} /></span>}
+          <span className="cp-vit-vel" />
+          <button className="cp-vit-volver" onClick={() => setVistaCat(null)} aria-label="Volver a las categorías"><Icono n="atras" tam={18} ancho={2.4} /></button>
+          <div className="cp-vit-txt">
+            <small>Nuestra carta</small>
+            <h3>{cat.nombre}</h3>
+            <span>{prods.length} {prods.length === 1 ? 'opción' : 'opciones'}</span>
+          </div>
         </div>
-        {fotoOk(p.foto) && <img className="cp-foto" src={p.foto} alt={p.nombre} loading="lazy" decoding="async" />}
-        <div className="cp-plato-pie">
-          <b>{p.agotado ? 'Agotado por hoy' : $(p.precio)}</b>
-          {puedeAgregar && !p.agotado && (
-            n === 0 ? (
-              <button className="cp-add" onClick={() => cambiar(p.id, 1)} aria-label={`Agregar ${p.nombre}`}>Agregar</button>
-            ) : (
-              <div className="cp-paso">
-                <button onClick={() => cambiar(p.id, -1)} aria-label={`Quitar uno de ${p.nombre}`}><Icono n="menos" tam={18} ancho={2.4} /></button>
-                <b>{n}</b>
-                <button onClick={() => cambiar(p.id, 1)} aria-label={`Agregar otro ${p.nombre}`}><Icono n="mas" tam={18} ancho={2.4} /></button>
-              </div>
-            )
-          )}
-        </div>
-      </article>
+
+        {prods.length === 0 && <p className="cp-suave" style={{ textAlign: 'center' }}>Pronto habrá platos en esta categoría.</p>}
+
+        {dest && (
+          <button className="cp-vit-dest" onClick={() => setDetalle({ p: dest, cat })} aria-label={`Ver detalle de ${dest.nombre}`}>
+            {media(dest, cat, 'cp-vit-dest-media', 40)}
+            <span className="cp-vit-dest-txt">
+              {dest.destacado ? <span className="cp-star"><Icono n="estrella" tam={13} className="it" /> Destacado</span> : null}
+              <b className="cp-vit-n">{dest.nombre}</b>
+              {dest.descripcion ? <span className="cp-vit-d">{dest.descripcion}</span> : null}
+              <span className="cp-vit-p">{$(dest.precio)}</span>
+            </span>
+          </button>
+        )}
+
+        {resto.length > 0 && (
+          <div className="cp-vit-grilla">
+            {resto.map((p, k) => (
+              <button
+                key={p.id}
+                className={`cp-vit-card${p.agotado ? ' agotado' : ''}${resto.length % 2 === 1 && k === resto.length - 1 ? ' ancho' : ''}`}
+                onClick={() => setDetalle({ p, cat })}
+                aria-label={`Ver detalle de ${p.nombre}`}
+              >
+                {media(p, cat, 'cp-vit-card-media', 30)}
+                <span className="cp-vit-card-txt">
+                  <b className="cp-vit-n">{p.nombre}</b>
+                  <span className="cp-vit-p">{p.agotado ? 'Agotado por hoy' : $(p.precio)}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+        {prods.length > 0 && <small className="cp-vit-ayuda">Toca un plato para ver su descripción.</small>}
+      </div>
     )
   }
 
@@ -521,15 +620,19 @@ export default function CartaPublica({ slug, token }) {
             <div className={`cp-aut${esperando ? ' espera' : ''}`} role="status">
               {esperando ? (
                 <><Icono n="arena" tam={18} className="it" /> <span><b>Esperando autorización del local.</b> Puedes ir mirando la carta; apenas te autoricen podrás agregar tus platos.</span></>
-              ) : aut.estado === 'rechazada' ? (
-                <><Icono n="alerta" tam={18} className="it" /> <span><b>No pudimos autorizar tu pedido.</b> {aut.motivo || 'Habla con la mesera y te ayuda enseguida.'}</span></>
+              ) : claveRech && rechOculta !== claveRech ? (
+                <>
+                  <Icono n="alerta" tam={18} className="it" />{' '}
+                  <span style={{ flex: 1 }}><b>No pudimos autorizar tu pedido.</b> {aut.motivo || 'Habla con la mesera y te ayuda enseguida.'}</span>
+                  <button className="cp-aut-x" onClick={() => setRechOculta(claveRech)} aria-label="Cerrar este aviso"><Icono n="cerrar" tam={16} /></button>
+                </>
               ) : (
                 <><Icono n="orden" tam={18} className="it" /> <span>Para pedir desde el celular, toca <b>Realizar pedido</b>. El local te autoriza y ahí eliges tus platos.</span></>
               )}
             </div>
           )}
           {puedeAgregar && aut?.exige && (
-            <div className="cp-aut ok" role="status"><Icono n="circulocheck" tam={18} className="it" /> <span><b>El local autorizó tu pedido.</b> Agrega tus platos con el botón «Agregar».</span></div>
+            <div className="cp-aut ok" role="status"><Icono n="circulocheck" tam={18} className="it" /> <span><b>El local autorizó tu pedido.</b> Agrega tus platos con el botón +.</span></div>
           )}
           {avisoAut && <div className="cp-aut" role="alert"><Icono n="alerta" tam={18} className="it" /> <span>{avisoAut}</span></div>}
         </div>
@@ -559,14 +662,18 @@ export default function CartaPublica({ slug, token }) {
             </div>
           )}
 
-          {catAbierta && (
+          {catAbierta && !puedeAgregar && vitrina(catAbierta)}
+          {catAbierta && puedeAgregar && (
             <div className="cp-cat">
               <div className="cp-cat-cab">
                 <button className="cp-volver" onClick={() => setVistaCat(null)} aria-label="Volver a las categorías"><Icono n="atras" tam={18} ancho={2.4} /></button>
                 <h3 className="cp-cat-t">{catAbierta.nombre}</h3>
                 <span className="cp-cat-n">{catAbierta.productos.length} {catAbierta.productos.length === 1 ? 'opción' : 'opciones'}</span>
               </div>
-              <div className="cp-cat-lista">{catAbierta.productos.map((p) => plato(p))}</div>
+              <div className="cp-cat-lista">
+                {catAbierta.productos.length === 0 && <p className="cp-suave" style={{ padding: '16px 0' }}>Pronto habrá platos en esta categoría.</p>}
+                {catAbierta.productos.map((p) => fila(p, catAbierta))}
+              </div>
             </div>
           )}
           {catAbierta && (
@@ -672,13 +779,51 @@ export default function CartaPublica({ slug, token }) {
               {!q && <small className="cp-suave">Escribe parte del nombre, con o sin tildes.</small>}
               {q && resultados.length === 0 && <small className="cp-suave">No hay platos con ese nombre.</small>}
               {necesitaAut && resultados.length > 0 && <small className="cp-suave">Para agregar platos, primero toca «Realizar pedido» y espera la autorización del local.</small>}
-              {resultados.map(({ p, cat }) => plato(p, cat))}
+              {resultados.map(({ p, cat }) => fila(p, catDe(p), cat))}
             </div>
             {resultados.length > 0 && puedeAgregar && unidades > 0 && (
               <button className="cp-sec-boton fuerte" onClick={() => setBuscando(false)}>Listo · ver mi pedido ({unidades})</button>
             )}
           </div>
         </div>,
+        document.body
+      )}
+
+      {detalle && createPortal(
+        (() => {
+          const { p, cat } = detalle
+          return (
+            <div className="hoja-velo funde" style={{ zIndex: 88 }} onClick={() => setDetalle(null)}>
+              <div className="hoja sube cp-det" role="dialog" aria-modal="true" aria-label={p.nombre} onClick={(e) => e.stopPropagation()}>
+                <div className="cp-det-media-caja">
+                  {media(p, cat, 'cp-det-media', 64)}
+                  <button className="cp-det-x" onClick={() => setDetalle(null)} aria-label="Cerrar"><Icono n="cerrar" tam={18} /></button>
+                </div>
+                <div className="hoja-cuerpo" style={{ paddingTop: 16, paddingBottom: 'calc(20px + var(--seguro-abajo, 0px))' }}>
+                  {p.destacado && !p.agotado ? <span className="cp-star"><Icono n="estrella" tam={13} className="it" /> Destacado</span> : null}
+                  <div>
+                    <h3 className="cp-det-n">{p.nombre}</h3>
+                    {cat ? <small className="cp-suave">{cat.nombre}</small> : null}
+                  </div>
+                  {p.descripcion ? <p className="cp-det-d">{p.descripcion}</p> : null}
+                  <div className="cp-det-pie">
+                    <b>{p.agotado ? 'Agotado por hoy' : $(p.precio)}</b>
+                    {control(p)}
+                  </div>
+                  {necesitaAut && !p.agotado && (
+                    esperando ? (
+                      <div className="cp-aut espera" style={{ margin: 0 }}><Icono n="arena" tam={18} className="it" /> <span>Esperando autorización del local. Apenas te autoricen podrás agregarlo.</span></div>
+                    ) : (
+                      <button className="cp-sec-boton fuerte" style={{ marginTop: 0 }} disabled={pidiendo} onClick={solicitar}>
+                        {pidiendo ? <span className="puntos">Enviando</span> : <><Icono n="orden" tam={16} className="it" /> Realizar pedido</>}
+                      </button>
+                    )
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })(),
         document.body
       )}
 
@@ -814,7 +959,6 @@ const CSS = `
 .cp-buscar-cab .campo-chico{flex:1;min-width:0}
 .cp-buscar-x{all:unset;cursor:pointer;flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--sup);border:1px solid var(--linea)}
 .cp-buscar-res{overflow-y:auto;overflow-x:hidden;min-height:60px;display:grid;grid-template-columns:minmax(0,1fr);align-content:start}
-.cp-buscar-res .cp-plato{padding:14px 0}
 .cp-nav{position:sticky;top:0;padding-top:env(safe-area-inset-top,0px);z-index:20;box-shadow:0 6px 14px -12px rgba(0,0,0,.6);background:color-mix(in srgb,var(--fondo) 92%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--linea);margin:6px 0 4px}
 .cp-nav-in{display:flex;gap:8px;overflow-x:auto;padding-top:10px;padding-bottom:10px;scrollbar-width:none}
 .cp-nav-in::-webkit-scrollbar{display:none}
@@ -825,23 +969,76 @@ const CSS = `
 .cp-cat-t{font-family:'Fraunces',Georgia,'Times New Roman',serif;font-size:27px;line-height:1.1;margin:0;letter-spacing:.2px}
 .cp-cat-n{font-size:13px;font-weight:700;color:var(--suave);white-space:nowrap}
 .cp-cat-lista{padding:0 18px}
-.cp-cat-lista .cp-plato:last-child{border-bottom:0}
-.cp-plato{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:14px;row-gap:12px;align-items:start;padding:18px 0;border-bottom:1px solid var(--linea)}
-.cp-plato:last-child{border-bottom:0}
-.cp-plato.agotado{opacity:.55}
-.cp-plato-txt{min-width:0;display:flex;flex-direction:column;gap:4px;grid-column:1}
-.cp-plato>.cp-foto{grid-column:2;grid-row:1}
-.cp-plato h4{margin:0;font-size:17px;line-height:1.25;overflow-wrap:anywhere}
-.cp-plato p{margin:0;color:var(--suave);font-size:14px;line-height:1.4}
-.cp-star{align-self:flex-start;font-size:11px;font-weight:800;letter-spacing:.3px;padding:2px 9px;border-radius:999px;background:var(--durazno);color:var(--aviso-tinta)}
-.cp-plato-pie{grid-column:1/-1;grid-row:2;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:40px}
-.cp-plato-pie>b{font-size:17px;white-space:nowrap;font-variant-numeric:tabular-nums}
-.cp-foto{width:96px;height:96px;object-fit:cover;border-radius:14px;flex:none;align-self:flex-start}
-.cp-add{all:unset;cursor:pointer;padding:10px 22px;border-radius:999px;background:var(--marca);color:var(--sobre-marca);font-weight:800;font-size:14px}
-.cp-paso{display:inline-flex;align-items:center;gap:2px;padding:3px;border-radius:999px;background:var(--sup);border:1px solid var(--linea)}
+.cp-star{align-self:flex-start;justify-self:start;display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;letter-spacing:.3px;padding:3px 9px;border-radius:999px;background:var(--durazno);color:var(--aviso-tinta)}
+.cp-ph{display:grid;place-items:center;color:rgba(255,255,255,.88);background:linear-gradient(135deg,color-mix(in srgb,var(--marca) 78%,#000),color-mix(in srgb,var(--marca) 38%,#000))}
+.cp-ph.v1{background:linear-gradient(135deg,#7a3b2e,#c0694a)}
+.cp-ph.v2{background:linear-gradient(135deg,#2f5d50,#5e9c85)}
+.cp-ph.v3{background:linear-gradient(135deg,#4a3b6b,#8c76c2)}
+.cp-ph.v4{background:linear-gradient(135deg,#6b5a2a,#c2a24d)}
+/* Vista elegante de una categoría (opción C): portada + destacado + grilla */
+.cp-vit{margin-top:22px;display:grid;gap:12px}
+.cp-vit-hero{position:relative;isolation:isolate;overflow:hidden;min-height:168px;border-radius:26px;display:grid;place-items:center;color:#fff;box-shadow:0 12px 30px -18px rgba(0,0,0,.6)}
+.cp-vit-hero>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2}
+.cp-vit-hero.sin-foto{background:linear-gradient(135deg,color-mix(in srgb,var(--marca) 78%,#000),color-mix(in srgb,var(--marca) 38%,#000))}
+.cp-vit-hero.sin-foto.v1{background:linear-gradient(135deg,#7a3b2e,#c0694a)}
+.cp-vit-hero.sin-foto.v2{background:linear-gradient(135deg,#2f5d50,#5e9c85)}
+.cp-vit-hero.sin-foto.v3{background:linear-gradient(135deg,#4a3b6b,#8c76c2)}
+.cp-vit-hero.sin-foto.v4{background:linear-gradient(135deg,#6b5a2a,#c2a24d)}
+.cp-vit-vel{position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.5))}
+.cp-vit-hero.sin-foto .cp-vit-vel{background:rgba(0,0,0,.14)}
+.cp-vit-volver{all:unset;cursor:pointer;position:absolute;top:12px;left:12px;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:rgba(0,0,0,.35);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.35);color:#fff}
+.cp-vit-txt{display:grid;gap:4px;justify-items:center;text-align:center;padding:26px 56px}
+.cp-vit-txt small{font-size:12px;font-weight:800;letter-spacing:2.5px;text-transform:uppercase;opacity:.9}
+.cp-vit-txt h3{margin:0;font-family:'Fraunces',Georgia,'Times New Roman',serif;font-weight:600;font-size:clamp(28px,8vw,38px);line-height:1.08;text-shadow:0 2px 14px rgba(0,0,0,.45);overflow-wrap:anywhere}
+.cp-vit-txt span{font-size:13px;font-weight:700;opacity:.9}
+.cp-vit-n{font-family:'Fraunces',Georgia,'Times New Roman',serif;font-weight:600;line-height:1.2;overflow-wrap:anywhere}
+.cp-vit-p{font-weight:800;font-variant-numeric:tabular-nums}
+.cp-vit-dest{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:118px minmax(0,1fr);min-height:140px;border-radius:20px;overflow:hidden;background:var(--sup);border:1px solid var(--linea);color:var(--tinta)}
+.cp-vit-dest-media{width:100%;height:100%;min-height:140px;object-fit:cover;display:grid}
+.cp-vit-dest-txt{display:flex;flex-direction:column;gap:5px;padding:14px 16px;min-width:0}
+.cp-vit-dest-txt .cp-vit-n{font-size:20px}
+.cp-vit-d{color:var(--suave);font-size:13.5px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.cp-vit-dest-txt .cp-vit-p{font-size:17px;margin-top:auto;padding-top:2px}
+.cp-vit-grilla{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media(min-width:620px){.cp-vit-grilla{grid-template-columns:repeat(3,minmax(0,1fr))}.cp-vit-card.ancho{grid-column:auto}}
+.cp-vit-card{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;border-radius:18px;overflow:hidden;background:var(--sup);border:1px solid var(--linea);color:var(--tinta)}
+.cp-vit-card.ancho{grid-column:1/-1}
+.cp-vit-card-media{width:100%;height:112px;object-fit:cover;display:grid;flex:none}
+.cp-vit-card.ancho .cp-vit-card-media{height:128px}
+.cp-vit-card-txt{display:flex;flex-direction:column;gap:4px;padding:10px 12px 12px;flex:1}
+.cp-vit-card-txt .cp-vit-n{font-size:16.5px}
+.cp-vit-card-txt .cp-vit-p{font-size:15px;margin-top:auto}
+.cp-vit-card.agotado,.cp-vit-dest.agotado{opacity:.55}
+.cp-vit-card:active,.cp-vit-dest:active{transform:scale(.985)}
+.cp-vit-ayuda{display:block;text-align:center;color:var(--suave);font-size:13px}
+/* Lista rápida para pedir (cuando el local ya autorizó) */
+.cp-fila{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--linea)}
+.cp-fila:last-child{border-bottom:0}
+.cp-fila.agotado{opacity:.55}
+.cp-fila-info{all:unset;cursor:pointer;flex:1;min-width:0;display:flex;align-items:center;gap:12px}
+.cp-fila-media{width:56px;height:56px;border-radius:12px;object-fit:cover;flex:none;display:grid}
+.cp-fila-txt{display:flex;flex-direction:column;gap:2px;min-width:0}
+.cp-fila-txt b{font-size:16px;line-height:1.25;overflow-wrap:anywhere}
+.cp-fila-txt small{font-size:12px;color:var(--suave)}
+.cp-fila-pr{font-size:14px;font-weight:700;color:var(--suave);font-variant-numeric:tabular-nums}
+.cp-mas{all:unset;cursor:pointer;flex:none;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:var(--marca);color:var(--sobre-marca)}
+.cp-mas:active{transform:scale(.92)}
+.cp-paso{flex:none;display:inline-flex;align-items:center;gap:2px;padding:3px;border-radius:999px;background:var(--sup);border:1px solid var(--linea)}
 .cp-paso button{all:unset;cursor:pointer;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:color-mix(in srgb,var(--marca) 16%,transparent);color:var(--tinta)}
 .cp-paso button:active{transform:scale(.92)}
-.cp-paso b{min-width:30px;text-align:center;font-size:16px}
+.cp-paso b{min-width:28px;text-align:center;font-size:16px}
+/* Ficha de un plato */
+.cp-det{overflow:hidden}
+.cp-det-media-caja{position:relative;flex:none}
+.cp-det-media{width:100%;height:220px;object-fit:cover;display:grid}
+.cp-det-media.cp-ph{height:150px}
+.cp-det-x{all:unset;cursor:pointer;position:absolute;top:12px;right:12px;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:rgba(0,0,0,.4);backdrop-filter:blur(6px);color:#fff}
+.cp-det-n{margin:0;font-family:'Fraunces',Georgia,'Times New Roman',serif;font-weight:600;font-size:26px;line-height:1.15;overflow-wrap:anywhere}
+.cp-det-d{margin:0;color:var(--suave);font-size:15px;line-height:1.5;white-space:pre-line}
+.cp-det-pie{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px}
+.cp-det-pie>b{font-size:21px;font-variant-numeric:tabular-nums}
+.cp-aut-x{all:unset;cursor:pointer;flex:none;width:30px;height:30px;margin:-4px -6px -4px 0;border-radius:50%;display:grid;place-items:center;color:inherit}
+.cp-sec-boton:disabled{opacity:.6;cursor:default}
 .cp-sobre{display:grid;gap:14px}
 .cp-sobre img{width:100%;max-height:320px;object-fit:cover;border-radius:20px;display:block}
 .cp-sobre p{margin:0;line-height:1.6;white-space:pre-line;color:var(--tinta)}
