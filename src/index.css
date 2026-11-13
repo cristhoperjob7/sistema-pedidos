@@ -73,12 +73,18 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  touch-action: pan-x pan-y; /* se puede deslizar, pero no hacer zoom */
+  overflow-x: clip; /* la pantalla no se corre hacia los lados */
+  overscroll-behavior-x: none;
   scrollbar-gutter: stable;
   -webkit-tap-highlight-color: transparent; /* sin el destello gris de iOS: el botón ya responde solo */
 }
 
 body {
   margin: 0;
+  overflow-x: clip;
+  max-width: 100%;
+  touch-action: pan-x pan-y;
   min-height: 100vh;
   min-height: 100dvh;
   color: var(--tinta);
@@ -304,7 +310,7 @@ button:disabled {
   width: auto;
   min-height: 40px;
   padding: 7px 10px;
-  font-size: 15px;
+  font-size: 16px; /* menos de 16px hace que el iPhone amplíe la pantalla al escribir */
   border-radius: 10px;
 }
 
@@ -1110,4 +1116,12 @@ a:focus-visible {
 }
 .vacio .btn {
   margin-top: 6px;
+}
+
+
+/* Ningún campo de texto baja de 16px: en iPhone, menos de eso amplía la pantalla al tocarlo. */
+input:not([type='checkbox']):not([type='radio']):not([type='range']),
+select,
+textarea {
+  font-size: max(16px, 1em);
 }

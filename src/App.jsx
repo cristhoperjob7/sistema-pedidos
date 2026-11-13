@@ -15,6 +15,7 @@ import Estadisticas from './Estadisticas'
 import Login, { NuevaClave, MARCA } from './Login'
 import { Avisos, Cargando, BannerConexion } from './ui'
 import { sentir } from './feedback'
+import './sinZoom'
 
 // Lee lo que Supabase deja en la dirección al volver del correo de recuperación.
 function leerEnlace() {
