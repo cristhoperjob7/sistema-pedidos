@@ -2,13 +2,12 @@ import { useEffect, useState } from 'react'
 import Icono from './iconos'
 import { supabase } from './supabase'
 import './Login.css'
+import { Marca, WHATSAPP_VISIBLE, urlWhatsapp } from './marca'
 import { sentir, sonar, vibrar } from './feedback'
 
-// Cambia aquí el nombre que se muestra en el sistema.
-export const MARCA = 'Sistema de Pedidos'
+export { MARCA } from './marca'
 
 const CLAVE_CODIGO = 'ultimo-codigo-restaurante'
-
 function leerCodigoGuardado() {
   try {
     return localStorage.getItem(CLAVE_CODIGO) ?? ''
@@ -16,7 +15,6 @@ function leerCodigoGuardado() {
     return ''
   }
 }
-
 function guardarCodigo(codigo) {
   try {
     localStorage.setItem(CLAVE_CODIGO, codigo)
@@ -25,36 +23,103 @@ function guardarCodigo(codigo) {
   }
 }
 
-// Estructura común: foto a la izquierda, tarjeta a la derecha.
+const PASOS = [
+  ['01', 'El cliente escanea el QR', 'Ve la carta con fotos en su celular, sin descargar nada.'],
+  ['02', 'La mesera autoriza', 'Tú decides qué mesa puede pedir. Nada llega a cocina sin pasar por el local.'],
+  ['03', 'La cocina lo recibe al instante', 'Con las notas de cada plato, en orden de llegada y sin papeles.'],
+]
+const FUNCIONES = [
+  ['mesas', 'Mesas', 'Estado de cada mesa de un vistazo: libre, ocupada, lista o por cobrar.'],
+  ['cubiertos', 'Cocina', 'Pedidos en pantalla con su tiempo de espera y aviso cuando están listos.'],
+  ['caja', 'Caja y cobro', 'Efectivo, tarjeta o transferencia, propina, descuentos y cuentas divididas.'],
+  ['qr', 'Carta QR', 'Tu carta siempre al día: cambias un precio o marcas un agotado y se ve al tiro.'],
+  ['tendencia', 'Reportes', 'Ventas del día y del mes, platos más vendidos y cierre de caja en PDF.'],
+  ['personas', 'Personal', 'Cada persona entra con su usuario y PIN, con lo justo para su trabajo.'],
+]
+
+// Portada de ReSystem con el ingreso arriba (el personal entra rápido; quien no conoce el sistema sigue leyendo).
 function Marco({ children }) {
   return (
     <div className="login">
-      <aside className="login-foto">
-        <div className="login-marca">
-          <span className="login-logo" aria-hidden="true">
-            <Icono n="cubiertos" tam={15} className="it" />
-          </span>
-          {MARCA}
-        </div>
-        <div className="login-mensaje">
-          <h2>Tu restaurante, en orden.</h2>
-          <p>Pedidos, cocina y caja conectados en tiempo real, desde cualquier dispositivo.</p>
-          <ul className="login-puntos">
-            <li>Pedidos que llegan a cocina al instante</li>
-            <li>Cuentas por mesa, sin papel</li>
-            <li>Reporte de ventas al cierre del día</li>
-          </ul>
-        </div>
-        <small className="login-credito">
-          Foto:{' '}
-          <a href="https://www.vecteezy.com" target="_blank" rel="noreferrer">
-            Vecteezy
+      <header className="lg-nav">
+        <Marca tam={26} />
+        <nav>
+          <a href="#como-funciona">Cómo funciona</a>
+          <a href="#plan">Plan</a>
+          <a className="lg-nav-cta" href={urlWhatsapp()} target="_blank" rel="noreferrer">
+            Prueba gratis
           </a>
-        </small>
-      </aside>
-      <main className="login-panel">
-        <div className="login-tarjeta">{children}</div>
-      </main>
+        </nav>
+      </header>
+
+      <section className="lg-hero">
+        <div className="lg-hero-txt">
+          <p className="lg-eyebrow">Sistema para restaurantes</p>
+          <h1 className="lg-titulo">Tu restaurante, en orden. De la mesa a la cocina.</h1>
+          <p className="lg-bajada">Pedidos desde la mesa con QR, cocina conectada y cobro en una sola app. Funciona en el celular, la tablet o el computador.</p>
+          <div className="lg-acciones">
+            <a className="lg-btn lg-btn-negro" href={urlWhatsapp()} target="_blank" rel="noreferrer">
+              Prueba 14 días gratis
+            </a>
+            <a className="lg-btn lg-btn-borde" href="#como-funciona">
+              Ver cómo funciona
+            </a>
+          </div>
+        </div>
+        <div className="login-tarjeta" id="ingresar">
+          {children}
+        </div>
+      </section>
+
+      <section className="lg-seccion" id="como-funciona">
+        <p className="lg-eyebrow">Cómo funciona</p>
+        <h2 className="lg-h2">Tus clientes piden desde la mesa. Tú mantienes el control.</h2>
+        <div className="lg-pasos">
+          {PASOS.map(([n, t, d]) => (
+            <div key={n} className="lg-paso">
+              <span className="lg-paso-n">{n}</span>
+              <b>{t}</b>
+              <p>{d}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="lg-seccion">
+        <p className="lg-eyebrow">Todo en un solo lugar</p>
+        <h2 className="lg-h2">Mesas, cocina y caja conectadas en tiempo real.</h2>
+        <div className="lg-funciones">
+          {FUNCIONES.map(([ic, t, d]) => (
+            <div key={t} className="lg-funcion">
+              <Icono n={ic} tam={22} />
+              <b>{t}</b>
+              <p>{d}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="lg-seccion" id="plan">
+        <div className="lg-plan">
+          <div>
+            <p className="lg-eyebrow" style={{ color: '#a3a3a3' }}>Un solo plan</p>
+            <h2 className="lg-h2" style={{ color: '#fff' }}>Todo incluido, sin contrato.</h2>
+            <p className="lg-plan-txt">Mesas, cocina, caja, carta QR, reportes y usuarios ilimitados. Te ayudamos a cargar tu carta y a dejar todo listo.</p>
+          </div>
+          <div className="lg-plan-cta">
+            <span className="lg-gratis">14 días gratis</span>
+            <a className="lg-btn lg-btn-blanco" href={urlWhatsapp()} target="_blank" rel="noreferrer">
+              Escríbenos por WhatsApp
+            </a>
+            <small>{WHATSAPP_VISIBLE}</small>
+          </div>
+        </div>
+      </section>
+
+      <footer className="lg-pie">
+        <Marca tam={20} />
+        <span>© {new Date().getFullYear()} ReSystem · Hecho en Chile</span>
+      </footer>
     </div>
   )
 }
@@ -170,7 +235,7 @@ export default function Login({ avisoInicial = '' }) {
   if (modo === 'recuperar') {
     return (
       <Marco>
-        <h1>Recuperar contraseña</h1>
+        <h2 className="login-h">Recuperar contraseña</h2>
         <p className="login-sub">
           Escribe el correo de tu cuenta de administración y te enviaremos un enlace para crear una nueva contraseña.
         </p>
@@ -212,8 +277,8 @@ export default function Login({ avisoInicial = '' }) {
 
   return (
     <Marco>
-      <h1>Iniciar sesión</h1>
-      <p className="login-sub">Ingresa con tus datos de acceso.</p>
+      <h2 className="login-h">Ingresar</h2>
+      <p className="login-sub">Usa los datos que te dio tu restaurante.</p>
 
       <div className="login-segmento" data-pos={modo === 'admin' ? 1 : 0} role="group" aria-label="Tipo de acceso">
         <button type="button" aria-pressed={modo === 'personal'} onClick={() => cambiarModo('personal')}>
@@ -349,7 +414,7 @@ export function NuevaClave({ onListo }) {
           <div className="login-listo" aria-hidden="true">
             <Icono n="check" tam={15} className="it" />
           </div>
-          <h1>Contraseña actualizada</h1>
+          <h2 className="login-h">Contraseña actualizada</h2>
           <p className="login-sub">Tu nueva contraseña ya está activa.</p>
           <button className="login-boton" style={{ width: '100%' }} onClick={onListo}>
             Ir al panel
@@ -357,7 +422,7 @@ export function NuevaClave({ onListo }) {
         </div>
       ) : (
         <>
-          <h1>Crea una nueva contraseña</h1>
+          <h2 className="login-h">Crea una nueva contraseña</h2>
           <p className="login-sub">Usa al menos 8 caracteres. Evita contraseñas que uses en otros sitios.</p>
           <form className="login-form" onSubmit={guardar}>
             <CampoClave

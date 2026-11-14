@@ -289,7 +289,7 @@ const s = {
     color: 'var(--tinta)',
     borderRadius: 20,
     padding: 18,
-    background: 'linear-gradient(135deg, color-mix(in srgb, var(--marca) 30%, var(--sup)) 0%, var(--sup) 100%)',
+    background: 'var(--sup)',
     boxShadow: 'var(--sombra)',
   },
   numeroGrande: { fontSize: 'clamp(28px, 8.5vw, 36px)', fontWeight: 900, lineHeight: 1.1 },

@@ -51,8 +51,8 @@
 }
 .ini-kpi-grande {
   grid-column: 1 / -1;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--marca) 20%, var(--sup)), var(--sup) 70%);
-  border-color: color-mix(in srgb, var(--marca) 35%, var(--linea));
+  background: var(--sup);
+  border-color: var(--tinta);
 }
 @media (min-width: 900px) {
   .ini-kpi-grande {
@@ -353,7 +353,7 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: conic-gradient(var(--marca) var(--pct), var(--lavanda) 0);
+  background: conic-gradient(var(--verde) var(--pct), var(--lavanda) 0);
 }
 .asist-anillo::before {
   content: '';

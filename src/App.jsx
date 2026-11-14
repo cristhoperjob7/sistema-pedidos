@@ -1,7 +1,7 @@
-import { BotonTema } from './tema'
+import './tema'
 import Icono from './iconos'
 import Agotados from './Agotados'
-import { aplicarColores, quitarColores } from './paletas'
+import { quitarColores } from './paletas'
 import Bienvenida, { guiaYaVista, marcarGuiaVista } from './Bienvenida'
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
@@ -95,10 +95,10 @@ const ROL_TEXTO = { admin: 'Administración', mesera: 'Salón', cocina: 'Cocina'
 
 // Cada perfil tiene su propio ícono y color en la cabecera, para distinguirlos de un vistazo.
 const ICONO_PERFIL = {
-  superadmin: { icono: 'escudo', fondo: '#a978ff', texto: 'Superadmin' },
-  admin: { icono: 'maletin', fondo: 'var(--marca)', texto: 'Administración' },
-  mesera: { icono: 'campana', fondo: 'var(--menta-tinta)', texto: 'Salón' },
-  cocina: { icono: 'gorro', fondo: 'var(--aviso-tinta)', texto: 'Cocina' },
+  superadmin: { icono: 'escudo', fondo: '#0a0a0a', texto: 'Superadmin' },
+  admin: { icono: 'maletin', fondo: '#0a0a0a', texto: 'Administración' },
+  mesera: { icono: 'campana', fondo: '#0a0a0a', texto: 'Salón' },
+  cocina: { icono: 'gorro', fondo: '#0a0a0a', texto: 'Cocina' },
 }
 
 function Panel({ sesion }) {
@@ -150,9 +150,8 @@ function Panel({ sesion }) {
   // Colores del restaurante (los elige el superadmin). Al salir vuelven los del sistema; el login nunca cambia.
   const rest = membresias[0]?.restaurantes
   useEffect(() => {
-    aplicarColores(rest)
-    return () => quitarColores()
-  }, [rest?.id, rest?.color_marca, rest?.color_fondo])
+    quitarColores() // diseño fijo para todos: ya no se aplican colores por restaurante
+  }, [rest?.id])
 
   // Primera vez que entra: se muestra la guía de su perfil (una sola vez por cuenta).
   useEffect(() => {
@@ -192,7 +191,6 @@ function Panel({ sesion }) {
               <Icono n="ayuda" tam={18} />
             </button>
           )}
-          <BotonTema />
           <button
             className="btn btn-chico"
             style={estilos.salir}

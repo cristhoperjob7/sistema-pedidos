@@ -3,7 +3,6 @@ import Icono from './iconos'
 import { supabase } from './supabase'
 import Admin from './Admin'
 import Anclar from './Anclar'
-import Colores from './Colores'
 import CobroSuper from './CobroSuper'
 import { Cargando, Desplegable, Mensaje, Confirmar } from './ui'
 import { avisar, celebrar, sentir, sonar, vibrar } from './feedback'
@@ -50,7 +49,6 @@ export default function Superadmin() {
   const [error, setError] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [abierto, setAbierto] = useState(null)
-  const [coloresDe, setColoresDe] = useState(null) // id del restaurante cuyos colores se están editando
   const [borrando, setBorrando] = useState(null) // id del restaurante que se está confirmando borrar
   const [claveBorrar, setClaveBorrar] = useState('')
   const [nombreBorrar, setNombreBorrar] = useState('')
@@ -270,17 +268,6 @@ export default function Superadmin() {
                 >
                   {abierto === r.id ? 'Cerrar' : 'Administrar'}
                 </button>
-                <button
-                  className={`btn ${coloresDe === r.id ? 'btn-morado' : 'btn-sec'}`}
-                  style={s.accion}
-                  aria-expanded={coloresDe === r.id}
-                  onClick={() => {
-                    sentir('toque')
-                    setColoresDe(coloresDe === r.id ? null : r.id)
-                  }}
-                >
-                  <Icono n="paleta" tam={15} className="it" /> Colores
-                </button>
                 <button className={`btn ${r.activo ? 'btn-sec' : 'btn-principal'}`} style={s.accion} onClick={() => alternar(r)}>
                   {r.activo ? 'Desactivar' : 'Activar'}
                 </button>
@@ -294,10 +281,6 @@ export default function Superadmin() {
                 </button>
               </div>
             </div>
-
-            <Desplegable abierto={coloresDe === r.id}>
-              <Colores restaurante={r} onGuardado={cargar} />
-            </Desplegable>
 
             <Desplegable abierto={abierto === r.id}>
               <div style={s.panelAdmin}>

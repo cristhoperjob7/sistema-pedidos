@@ -241,7 +241,7 @@ const s = {
   kpiPrincipal: {
     gridColumn: '1 / -1',
     color: 'var(--tinta)',
-    background: 'linear-gradient(135deg, color-mix(in srgb, var(--marca) 30%, var(--sup)) 0%, var(--sup) 100%)',
+    background: 'var(--sup)',
     boxShadow: 'var(--sombra)',
   },
   kpiValor: { fontSize: 'clamp(22px, 6vw, 26px)', fontWeight: 900 },

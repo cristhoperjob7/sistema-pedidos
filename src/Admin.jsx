@@ -16,7 +16,6 @@ import Anclar from './Anclar'
 import MiPlan from './MiPlan'
 import { avisoPlan, estiloTono, planBloqueado, planVisible, usePlan } from './plan'
 import Icono from './iconos'
-import { SelectorTema } from './tema'
 import { sentir } from './feedback'
 import './panel.css'
 
@@ -176,7 +175,6 @@ export default function Admin({ restaurante, scrollAlAbrir = false, conPedidos =
             </div>
           ))}
           <div className="lateral-pie">
-            <SelectorTema />
           </div>
         </nav>
 
