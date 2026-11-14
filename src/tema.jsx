@@ -1,93 +1,23 @@
-import { useSyncExternalStore } from 'react'
-import Icono from './iconos'
-import { sentir } from './feedback'
-
-// Modo claro por defecto; el oscuro es una alternativa para descansar la vista. Se recuerda en cada dispositivo.
-const CLAVE = 'tema'
-const oyentes = new Set()
-
-function leer() {
-  try {
-    return localStorage.getItem(CLAVE) === 'oscuro' ? 'oscuro' : 'claro'
-  } catch {
-    return 'claro'
-  }
-}
-
-let actual = leer()
-
+// ReSystem usa modo oscuro dentro del sistema. La carta QR que ven los clientes queda clara (se lee mejor de día).
+const esCarta = () => /^\/c\//.test(location.pathname || '') || /^#\/carta\//.test(location.hash || '')
 function aplicar() {
-  document.documentElement.dataset.tema = actual
+  const t = esCarta() ? 'claro' : 'oscuro'
+  document.documentElement.dataset.tema = t
   const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) {
-    const f = getComputedStyle(document.documentElement).getPropertyValue('--fondo').trim()
-    meta.setAttribute('content', f || (actual === 'claro' ? '#fafaf9' : '#0a0a0a'))
-  }
+  if (meta) meta.setAttribute('content', t === 'claro' ? '#fafaf9' : '#0a0a0a')
 }
 aplicar()
-
-export function elegirTema(t) {
-  if (t === actual) return
-  actual = t
-  try {
-    localStorage.setItem(CLAVE, t)
-  } catch {
-    /* sin almacenamiento: el cambio vale solo mientras la página está abierta */
-  }
-  aplicar()
-  oyentes.forEach((f) => f())
+window.addEventListener('hashchange', aplicar)
+try {
+  localStorage.removeItem('tema')
+} catch {
+  /* sin almacenamiento: no pasa nada */
 }
 
-export function useTema() {
-  return useSyncExternalStore(
-    (f) => {
-      oyentes.add(f)
-      return () => oyentes.delete(f)
-    },
-    () => actual,
-  )
-}
-
-// Botón redondo para el encabezado: muestra el modo al que se cambiaría.
+export const useTema = () => document.documentElement.dataset.tema
 export function BotonTema() {
-  const tema = useTema()
-  const claro = tema === 'claro'
-  return (
-    <button
-      className="btn btn-chico btn-icono-tema"
-      aria-label={claro ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'}
-      title={claro ? 'Modo oscuro' : 'Modo claro'}
-      onClick={() => {
-        sentir('toque')
-        elegirTema(claro ? 'oscuro' : 'claro')
-      }}
-    >
-      <Icono n={claro ? 'luna' : 'sol'} tam={18} />
-    </button>
-  )
+  return null
 }
-
-// Selector con las dos opciones a la vista (para el panel lateral).
 export function SelectorTema() {
-  const tema = useTema()
-  return (
-    <div className="selector-tema" role="group" aria-label="Modo de color">
-      {[
-        ['claro', 'Claro', 'sol'],
-        ['oscuro', 'Oscuro', 'luna'],
-      ].map(([id, texto, ic]) => (
-        <button
-          key={id}
-          aria-pressed={tema === id}
-          onClick={() => {
-            if (tema !== id) sentir('toque')
-            elegirTema(id)
-          }}
-        >
-          <Icono n={ic} tam={15} />
-          {texto}
-        </button>
-      ))}
-    </div>
-  )
+  return null
 }

@@ -197,10 +197,10 @@ function Panel({ sesion }) {
   const clavePerfil = perfil?.es_superadmin ? 'superadmin' : (ICONO_PERFIL[miembro?.rol] ? miembro.rol : 'admin')
   // Insignia dorada "Pro": el local está al día con su mensualidad (o es piloto).
   const plan = usePlan(perfil?.es_superadmin ? null : miembro?.restaurantes?.id)
-  const pro = !perfil?.es_superadmin && !!miembro && planPro(plan)
+  const pro = !!perfil?.es_superadmin || (!!miembro && planPro(plan))
   const rolTexto = ROL_TEXTO[miembro?.rol] ?? ''
   const subtitulo = perfil?.es_superadmin ? (
-    'Superadmin'
+    <span className="oro-texto">Superadmin Pro</span>
   ) : miembro ? (
     <>
       {miembro.restaurantes.nombre} ·{' '}
