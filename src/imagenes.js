@@ -76,6 +76,19 @@ export async function subirImagen(restauranteId, archivo, { max = 1200, calidad 
   return supabase.storage.from(BUCKET).getPublicUrl(ruta).data.publicUrl
 }
 
+// Sube la foto de un comprobante de pago al depósito PRIVADO «comprobantes» y devuelve su ruta (no una dirección pública).
+export async function subirComprobante(restauranteId, archivo) {
+  const blob = await preparar(archivo, 1400, 0.78)
+  const ext = blob.type === 'image/webp' ? 'webp' : 'jpg'
+  const id = (crypto.randomUUID?.() ?? `${Date.now()}${Math.random().toString(16).slice(2)}`).replace(/-/g, '')
+  const ruta = `${restauranteId}/${id}.${ext}`
+  const { error } = await supabase.storage.from('comprobantes').upload(ruta, blob, { contentType: blob.type, upsert: false })
+  if (error) {
+    throw new Error(/bucket|not found|policy|row-level/i.test(error.message) ? 'No se pudo subir la foto. ¿Ejecutaste paso35.sql en Supabase?' : error.message)
+  }
+  return ruta
+}
+
 // Borra una foto que ya no se usa (si falla no pasa nada: solo queda un archivo huérfano).
 export async function borrarImagen(url) {
   const marca = `/${BUCKET}/`

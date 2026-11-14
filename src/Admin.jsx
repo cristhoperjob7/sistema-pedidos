@@ -13,6 +13,8 @@ import Inicio from './Inicio'
 import ReporteMensual from './ReporteMensual'
 import Estadisticas from './Estadisticas'
 import Anclar from './Anclar'
+import MiPlan from './MiPlan'
+import { avisoPlan, estiloTono, planBloqueado, planVisible, usePlan } from './plan'
 import Icono from './iconos'
 import { SelectorTema } from './tema'
 import { sentir } from './feedback'
@@ -24,9 +26,12 @@ const ANCHO = { maxWidth: 1080, margin: '0 auto', width: '100%' }
 // Secciones del menú lateral. "Operación" (Pedidos y Cocina) solo aparece cuando el administrador
 // entra a operar el local: así, si solo quiere revisar números, no recibe sonidos de pedidos ni de cocina.
 // El superadmin que entra a un restaurante solo ve "Negocio".
-function secciones(conPedidos, operando) {
-  return [
-    { titulo: 'General', items: [['inicio', 'Inicio', 'inicio']] },
+// Si el plan venció (solo lectura), quedan solo las secciones para consultar y «Mi plan».
+const SOLO_LECTURA = ['plan', 'historial', 'reporte', 'reporte_mes', 'estadisticas']
+
+function secciones(conPedidos, operando, conPlan, bloqueado) {
+  const grupos = [
+    { titulo: 'General', items: [['inicio', 'Inicio', 'inicio'], conPlan && ['plan', 'Mi plan', 'tarjeta']].filter(Boolean) },
     conPedidos && operando && {
       titulo: 'Operación',
       items: [
@@ -54,6 +59,10 @@ function secciones(conPedidos, operando) {
       ],
     },
   ].filter(Boolean)
+  if (!bloqueado) return grupos
+  return grupos
+    .map((g) => ({ ...g, items: g.items.filter(([id]) => SOLO_LECTURA.includes(id)) }))
+    .filter((g) => g.items.length > 0)
 }
 
 // Panel de administración de un restaurante. Lo usan su administrador y el superadmin.
@@ -62,7 +71,19 @@ export default function Admin({ restaurante, scrollAlAbrir = false, conPedidos =
   const [tab, setTab] = useState('inicio')
   const [abierto, setAbierto] = useState(false) // cajón del celular
   const [operando, setOperando] = useState(false) // Pedidos y Cocina montados (con su sonido)
-  const grupos = secciones(conPedidos, operando)
+  // El plan solo aplica al administrador del local (no al superadmin que entra a mirar).
+  const plan = usePlan(conPedidos ? restaurante.id : null)
+  const conPlan = conPedidos && planVisible(plan)
+  const bloqueado = conPedidos && planBloqueado(plan)
+  const aviso = conPedidos ? avisoPlan(plan) : null
+  const grupos = secciones(conPedidos, operando && !bloqueado, conPlan, bloqueado)
+
+  // Al quedar en solo lectura: se sale de la operación y se va a «Mi plan».
+  useEffect(() => {
+    if (!bloqueado) return
+    setOperando(false)
+    setTab((t) => (SOLO_LECTURA.includes(t) ? t : 'plan'))
+  }, [bloqueado])
   const nombreActivo = grupos.flatMap((g) => g.items).find(([id]) => id === tab)?.[1]
 
   useEffect(() => {
@@ -73,6 +94,7 @@ export default function Admin({ restaurante, scrollAlAbrir = false, conPedidos =
   }, [abierto])
 
   function elegir(id) {
+    if (bloqueado && !SOLO_LECTURA.includes(id)) return
     sentir('toque')
     setAbierto(false)
     if (id === 'pedidos' || id === 'cocina') setOperando(true)
@@ -121,7 +143,7 @@ export default function Admin({ restaurante, scrollAlAbrir = false, conPedidos =
         <div className={`velo${abierto ? ' abierto' : ''}`} onClick={() => setAbierto(false)} aria-hidden="true" />
 
         <nav id="menu-lateral" className={`lateral${abierto ? ' abierto' : ''}`} aria-label="Secciones del panel">
-          {conPedidos &&
+          {conPedidos && !bloqueado &&
             (operando ? (
               <div style={{ display: 'grid', gap: 6, padding: '4px 4px 8px' }}>
                 <button className="btn btn-sec btn-bloque" onClick={salirOperacion}>
@@ -158,23 +180,36 @@ export default function Admin({ restaurante, scrollAlAbrir = false, conPedidos =
           </div>
         </nav>
 
-        <div style={{ minWidth: 0, display: 'grid', gap: 12 }}>
+        <div style={{ minWidth: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12 }}>
+          {aviso && tab !== 'plan' && (
+            <button
+              type="button"
+              className="msj"
+              onClick={() => elegir('plan')}
+              style={{ ...estiloTono(aviso.tono), display: 'flex', alignItems: 'center', gap: 8, borderRadius: 14, padding: '10px 14px', fontSize: 14, whiteSpace: 'normal', textAlign: 'left', border: 0, cursor: 'pointer', margin: 0 }}
+            >
+              <Icono n="alerta" tam={18} />
+              <span style={{ flex: 1 }}>{aviso.texto}</span>
+              <b style={{ whiteSpace: 'nowrap' }}>Pagar</b>
+            </button>
+          )}
           {/* Pedidos y Cocina quedan siempre montadas (solo se esconden) para que su conexión en vivo
               y el estado del sonido no se reinicien cada vez que se cambia de sección. */}
-          {conPedidos && operando && (
+          {conPedidos && operando && !bloqueado && (
             <div className="funde" style={{ display: tab === 'pedidos' ? 'block' : 'none' }}>
               <AvisosQR restaurante={restaurante} />
               <Mesera restaurante={restaurante} rol="admin" />
             </div>
           )}
-          {conPedidos && operando && (
+          {conPedidos && operando && !bloqueado && (
             <div className="funde" style={{ display: tab === 'cocina' ? 'block' : 'none' }}>
               <Cocina restaurante={restaurante} />
             </div>
           )}
           {!['pedidos', 'cocina'].includes(tab) && (
             <div key={tab} className="aparece" style={tab === 'inicio' ? ANCHO : ANGOSTO}>
-              {tab === 'inicio' && <Inicio restaurante={restaurante} conPedidos={conPedidos} ir={elegir} />}
+              {tab === 'plan' && conPlan && <MiPlan restaurante={restaurante} plan={plan} />}
+              {tab === 'inicio' && !bloqueado && <Inicio restaurante={restaurante} conPedidos={conPedidos} ir={elegir} />}
               {tab === 'historial' && conPedidos && <Historial restaurante={restaurante} />}
               {tab === 'caja' && <Caja restaurante={restaurante} />}
               {tab === 'reporte' && conPedidos && <Reporte restaurante={restaurante} />}

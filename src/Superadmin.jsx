@@ -4,6 +4,7 @@ import { supabase } from './supabase'
 import Admin from './Admin'
 import Anclar from './Anclar'
 import Colores from './Colores'
+import CobroSuper from './CobroSuper'
 import { Cargando, Desplegable, Mensaje, Confirmar } from './ui'
 import { avisar, celebrar, sentir, sonar, vibrar } from './feedback'
 
@@ -200,6 +201,7 @@ export default function Superadmin() {
         </small>
       </h2>
       <Mensaje tipo="error">{error}</Mensaje>
+      <CobroSuper />
 
       {lista.length === 0 && (
         <div className="vacio">

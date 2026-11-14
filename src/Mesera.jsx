@@ -1812,7 +1812,7 @@ function Cobrar({ restaurante, datos, rol, cajaDe, mesa, pedido, items, onVolver
   }
 
   return (
-    <div className="entra-derecha" style={{ ...s.contenido, display: 'grid', gap: 12 }}>
+    <div className="entra-derecha" style={{ ...s.contenido, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12 }}>
       <div style={{ ...s.cabecera, marginBottom: 0 }}>
         <button className="btn btn-fantasma" onClick={onVolver} disabled={!!trabajando}>
           ‹ Volver
@@ -1939,7 +1939,7 @@ function Cobrar({ restaurante, datos, rol, cajaDe, mesa, pedido, items, onVolver
           {trabajando ? <span className="puntos">Registrando</span> : 'Registrar cortesía'}
         </button>
       ) : (
-        <div style={{ display: 'grid', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 10 }}>
           <h3 style={{ ...s.titulo, margin: '4px 0 0' }}>¿Cómo paga?</h3>
           <div style={s.pagos}>
             {datos.pagos.map((m, i) => (
@@ -1977,8 +1977,8 @@ function Cobrar({ restaurante, datos, rol, cajaDe, mesa, pedido, items, onVolver
         onCancelar={() => setTransf(null)}
         onConfirmar={(e) => cobrar(transf, e)}
       >
-        <div style={{ display: 'grid', gap: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
             <span className="suave">Monto a transferir</span>
             <b className="numero" style={{ fontSize: 22 }}>{formatear(aPagar, restaurante)}</b>
           </div>
@@ -2373,5 +2373,5 @@ const s = {
     border: '1px solid color-mix(in srgb, var(--marca) 35%, transparent)',
     boxShadow: 'var(--sombra)',
   },
-  pagos: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 },
+  pagos: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px, 100%), 1fr))', gap: 10 },
 }

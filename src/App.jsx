@@ -6,6 +6,7 @@ import Bienvenida, { guiaYaVista, marcarGuiaVista } from './Bienvenida'
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import Superadmin from './Superadmin'
+import { BloqueoPlan } from './MiPlan'
 import Admin from './Admin'
 import Mesera from './Mesera'
 import Turno from './Turno'
@@ -234,11 +235,17 @@ function Panel({ sesion }) {
           <div className="aparece">
             {miembro.rol === 'admin' && <Admin restaurante={miembro.restaurantes} conPedidos />}
             {miembro.rol === 'mesera' && (
-              <Turno restaurante={miembro.restaurantes}>
-                <Mesera restaurante={miembro.restaurantes} />
-              </Turno>
+              <BloqueoPlan restaurante={miembro.restaurantes}>
+                <Turno restaurante={miembro.restaurantes}>
+                  <Mesera restaurante={miembro.restaurantes} />
+                </Turno>
+              </BloqueoPlan>
             )}
-            {miembro.rol === 'cocina' && <Cocina restaurante={miembro.restaurantes} />}
+            {miembro.rol === 'cocina' && (
+              <BloqueoPlan restaurante={miembro.restaurantes}>
+                <Cocina restaurante={miembro.restaurantes} />
+              </BloqueoPlan>
+            )}
           </div>
         )}
       </main>
