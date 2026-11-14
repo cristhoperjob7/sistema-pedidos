@@ -91,6 +91,36 @@ function AppPersonal() {
   )
 }
 
+// Aviso que publica el superadmin para todo el personal del local (ej: una mantención). Si no hay, no muestra nada.
+function AvisoSoporte({ restaurante }) {
+  const [aviso, setAviso] = useState(null)
+  const [cerrado, setCerrado] = useState('')
+  useEffect(() => {
+    if (!restaurante?.id) return
+    const cargar = () =>
+      supabase.rpc('aviso_del_local', { p_restaurante: restaurante.id }).then(({ data, error }) => {
+        if (!error) setAviso(data)
+      })
+    cargar()
+    const t = setInterval(cargar, 5 * 60 * 1000)
+    return () => clearInterval(t)
+  }, [restaurante?.id])
+  if (!aviso?.texto || cerrado === aviso.texto) return null
+  return (
+    <div role="status" style={{ maxWidth: 1360, margin: '12px auto 0', padding: '0 16px' }}>
+      <div className="msj" style={{ margin: 0, display: 'flex', gap: 10, alignItems: 'flex-start', background: 'var(--durazno)', color: 'var(--aviso-tinta)', border: '1px solid var(--borde-aviso)' }}>
+        <Icono n="alerta" tam={18} />
+        <span style={{ flex: 1 }}>
+          <b>Aviso de ReSystem:</b> {aviso.texto}
+        </span>
+        <button className="btn btn-chico btn-fantasma" style={{ minHeight: 28, padding: '0 6px', color: 'inherit' }} aria-label="Cerrar aviso" onClick={() => setCerrado(aviso.texto)}>
+          <Icono n="cerrar" tam={16} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 const ROL_TEXTO = { admin: 'Administración', mesera: 'Salón', cocina: 'Cocina' }
 
 // Cada perfil tiene su propio ícono en la cabecera, para distinguirlos de un vistazo.
@@ -205,6 +235,7 @@ function Panel({ sesion }) {
         </div>
       </header>
       {guia && miembro && <Bienvenida rol={miembro.rol} onCerrar={cerrarGuia} />}
+      {miembro && <AvisoSoporte restaurante={miembro.restaurantes} />}
       <main style={estilos.main}>
         {error && <p className="msj msj-error">Error: {error}</p>}
 

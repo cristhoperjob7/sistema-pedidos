@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import Icono from './iconos'
 import { supabase } from './supabase'
-import Admin from './Admin'
+import SoporteLocal from './SoporteLocal'
 import Anclar from './Anclar'
 import CobroSuper from './CobroSuper'
 import { Cargando, Desplegable, Mensaje, Confirmar } from './ui'
@@ -266,7 +266,7 @@ export default function Superadmin() {
                   aria-expanded={abierto === r.id}
                   onClick={() => alternarAdmin(r)}
                 >
-                  {abierto === r.id ? 'Cerrar' : 'Administrar'}
+                  {abierto === r.id ? 'Cerrar' : 'Soporte'}
                 </button>
                 <button className={`btn ${r.activo ? 'btn-sec' : 'btn-principal'}`} style={s.accion} onClick={() => alternar(r)}>
                   {r.activo ? 'Desactivar' : 'Activar'}
@@ -285,8 +285,8 @@ export default function Superadmin() {
             <Desplegable abierto={abierto === r.id}>
               <div style={s.panelAdmin}>
                 <Anclar block="start" />
-                <b style={s.panelAdminTitulo}>Administrando: {r.nombre}</b>
-                <Admin restaurante={r} />
+                <b style={s.panelAdminTitulo}>Soporte · {r.nombre}</b>
+                <SoporteLocal restaurante={r} />
               </div>
             </Desplegable>
 
