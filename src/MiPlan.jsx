@@ -36,6 +36,56 @@ function leerDatos(texto) {
 }
 
 const DIAS_PERIODO = 30
+// Con el plan pagado no se muestran los datos para transferir: vuelven a aparecer estos días antes de vencer.
+export const DIAS_AVISO_PAGO = 2
+
+const BENEFICIOS = [
+  ['mesas', 'Mesas y pedidos', 'Toma pedidos desde el celular, sin papel.'],
+  ['fuego', 'Cocina conectada', 'Los pedidos llegan solos a la cocina.'],
+  ['qr', 'Carta QR', 'Tus clientes ven la carta y piden desde la mesa.'],
+  ['caja', 'Caja y cobros', 'Efectivo, tarjeta y transferencia, con cierre diario.'],
+  ['barras', 'Reportes', 'Ventas del día, del mes y lo más vendido.'],
+  ['personas', 'Personal ilimitado', 'Todas las meseras y cocineros que necesites.'],
+  ['ayuda', 'Soporte directo', 'Te ayudamos cuando lo necesites.'],
+  ['tendencia', 'Mejoras incluidas', 'Cada novedad llega sin costo extra.'],
+]
+
+function PlanPagado({ plan, precio }) {
+  return (
+    <>
+      <section className="mp-activo">
+        <div className="mp-fila">
+          <span className="mp-plan">
+            <Corona tam={20} />
+            <span className="mp-oro">ReSystem Pro</span>
+          </span>
+          <span className="mp-ok">✓ Activo</span>
+        </div>
+        <p className="mp-gracias">Gracias por confiar en ReSystem. Tu local tiene todo funcionando.</p>
+        <small className="mp-hasta">
+          Pagado hasta el <b>{fechaPlan(plan.vence)}</b> · {pesos(precio)}/mes
+        </small>
+      </section>
+      <section className="mp-incluye">
+        <b>Lo que incluye tu plan</b>
+        <div className="mp-beneficios">
+          {BENEFICIOS.map(([ic, t, d]) => (
+            <div key={t} className="mp-beneficio">
+              <span className="mp-b-ic" aria-hidden="true">
+                <Icono n={ic} tam={18} />
+              </span>
+              <b>{t}</b>
+              <small>{d}</small>
+            </div>
+          ))}
+        </div>
+        <small className="suave">
+          Los datos para pagar aparecen aquí {DIAS_AVISO_PAGO} días antes de que venza tu plan.
+        </small>
+      </section>
+    </>
+  )
+}
 
 // «Mi plan»: lo ve el administrador del local cuando el cobro está encendido (y el local no es piloto).
 // Muestra su plan, los datos para transferir y 3 pasos simples para avisar que pagó (el monto ya viene fijo).
@@ -78,6 +128,7 @@ export default function MiPlan({ restaurante, plan }) {
   const datos = leerDatos(plan.datos_pago)
   const pendiente = (pagos ?? []).find((p) => p.estado === 'pendiente')
   const precio = Number(plan.precio) || 0
+  const pagado = ['al_dia', 'por_vencer'].includes(plan.estado) && d > DIAS_AVISO_PAGO
 
   async function copiar(texto, que) {
     try {
@@ -138,6 +189,10 @@ export default function MiPlan({ restaurante, plan }) {
         <small className="suave">Mesas, cocina, caja, carta QR y reportes, sin límite de usuarios.</small>
       </div>
 
+      {pagado && !pendiente ? (
+        <PlanPagado plan={plan} precio={precio} />
+      ) : (
+      <>
       {/* Tarjeta del plan */}
       <section className={`mp-tarjeta${malo ? ' malo' : ''}`}>
         <div className="mp-fila">
@@ -261,6 +316,8 @@ export default function MiPlan({ restaurante, plan }) {
             </div>
           </div>
         </form>
+      )}
+      </>
       )}
 
       {pagos?.length > 0 && (

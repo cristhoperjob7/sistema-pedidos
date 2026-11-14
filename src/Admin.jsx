@@ -14,6 +14,7 @@ import ReporteMensual from './ReporteMensual'
 import Estadisticas from './Estadisticas'
 import Anclar from './Anclar'
 import MiPlan from './MiPlan'
+import { AgotadosInventario } from './Agotados'
 import { SelectorTema } from './tema'
 import { avisoPlan, estiloTono, planBloqueado, planVisible, usePlan } from './plan'
 import Icono from './iconos'
@@ -43,6 +44,7 @@ function secciones(conPedidos, operando, conPlan, bloqueado) {
       titulo: 'Negocio',
       items: [
         ['menu', 'Menú', 'libro'],
+        ['agotados', 'Agotados e inventario', 'prohibido'],
         ['local', 'Mesas y ajustes', 'mesas'],
         ['qr', 'Carta y QR', 'qr'],
         ['personal', 'Personal', 'personas'],
@@ -216,6 +218,7 @@ export default function Admin({ restaurante, scrollAlAbrir = false, conPedidos =
               {tab === 'reporte_mes' && conPedidos && <ReporteMensual restaurante={restaurante} />}
               {tab === 'estadisticas' && conPedidos && <Estadisticas restaurante={restaurante} onVolver={() => elegir('inicio')} />}
               {tab === 'menu' && <Menu restaurante={restaurante} />}
+              {tab === 'agotados' && <AgotadosInventario restaurante={restaurante} />}
               {tab === 'local' && <Local restaurante={restaurante} />}
               {tab === 'qr' && <CodigosQR restaurante={restaurante} />}
               {tab === 'personal' && <Personal restaurante={restaurante} />}

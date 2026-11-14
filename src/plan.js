@@ -72,7 +72,7 @@ export function avisoPlan(p) {
   const d = p.dias
   const cuando = d === 0 ? 'hoy' : d === 1 ? 'mañana' : `en ${d} días`
   if (p.estado === 'prueba' && d <= 5) return { tono: 'aviso', texto: `Tu prueba gratis termina ${cuando}.` }
-  if (p.estado === 'por_vencer') return { tono: 'aviso', texto: `Tu mensualidad vence ${cuando} (${fechaPlan(p.vence)}).` }
+  if (p.estado === 'por_vencer' && d <= 2) return { tono: 'aviso', texto: `Tu mensualidad vence ${cuando} (${fechaPlan(p.vence)}).` }
   if (p.estado === 'atrasado') return { tono: 'error', texto: `Tu mensualidad venció. El ${fechaPlan(p.bloqueo)} el sistema queda solo para consultar.` }
   if (p.estado === 'moroso') return { tono: 'error', texto: 'Tu plan está vencido: el sistema quedó solo para consultar. Paga para volver a usarlo.' }
   return null

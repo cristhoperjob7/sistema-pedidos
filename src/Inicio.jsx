@@ -6,7 +6,6 @@ import { Cargando, Mensaje, NumeroAnimado } from './ui'
 import { sentir } from './feedback'
 import { hoyEn } from './agotado'
 import { traerTodo } from './consultas'
-import Asistente from './Asistente'
 import './inicio.css'
 
 // =============================================================================================
@@ -173,7 +172,7 @@ export default function Inicio({ restaurante, conPedidos, ir }) {
           <h2 style={{ margin: 0 }}>
             {saludo(zona)}, <span className="ini-nombre">{quien || restaurante.nombre}</span>
           </h2>
-          <small className="suave ini-fecha">{fecha}</small>
+          <small className="suave ini-fecha">{quien ? `${restaurante.nombre} · ${fecha}` : fecha}</small>
         </div>
         {conPedidos && (
           <button
@@ -187,8 +186,6 @@ export default function Inicio({ restaurante, conPedidos, ir }) {
           </button>
         )}
       </header>
-
-      <Asistente restaurante={restaurante} ir={ir} />
 
       {conPedidos && (
         <>

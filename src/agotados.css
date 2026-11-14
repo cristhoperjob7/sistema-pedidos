@@ -1,0 +1,136 @@
+/* Agotados de hoy: buscador, solo agotados a la vista y guardado en grupo. */
+.ago { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+
+.ago-buscar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 12px 0 14px;
+  border: 1px solid var(--lavanda-2);
+  border-radius: 14px;
+  background: var(--lavanda);
+  color: var(--suave);
+}
+.ago-buscar:focus-within { border-color: var(--tinta); color: var(--tinta); }
+.ago-buscar input {
+  all: unset;
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  font-size: 16px;
+  color: var(--tinta);
+}
+.ago-buscar input::placeholder { color: var(--suave); }
+.ago-buscar input::-webkit-search-cancel-button { display: none; }
+.ago-limpiar {
+  all: unset;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 99px;
+  cursor: pointer;
+}
+
+.ago-lista { display: grid; gap: 6px; }
+.ago-sec {
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  font-size: 12px;
+  color: var(--suave);
+  padding: 2px 2px;
+}
+
+.ago-fila {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 54px;
+  padding: 8px 12px;
+  border: 1px solid var(--linea);
+  border-radius: 14px;
+  background: var(--sup);
+  cursor: pointer;
+  transition: background 160ms, border-color 160ms;
+}
+.ago-fila[data-marcado] { background: var(--rosa); border-color: color-mix(in srgb, var(--rosa-tinta) 35%, transparent); }
+.ago-fila[data-pendiente] { border-style: dashed; }
+.ago-fila:focus-visible { outline: 2px solid var(--tinta); outline-offset: 2px; }
+
+.ago-check {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  border: 2px solid var(--lavanda-2);
+  color: #fff;
+}
+.ago-fila[data-marcado] .ago-check { background: var(--rosa-tinta); border-color: var(--rosa-tinta); color: var(--sup); }
+
+.ago-nombre { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.ago-nombre b { font-weight: 650; overflow-wrap: anywhere; }
+.ago-fila[data-marcado] .ago-nombre b { color: var(--rosa-tinta); }
+.ago-nombre small { font-size: 12px; color: var(--suave); }
+
+.ago-chip {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 750;
+}
+.ago-chip.rojo { background: color-mix(in srgb, var(--rosa-tinta) 16%, transparent); color: var(--rosa-tinta); }
+.ago-chip.verde { background: var(--menta); color: var(--menta-tinta); }
+
+/* Barra de guardar: aparece solo si hay cambios, pegada abajo mientras se baja por la lista. */
+.ago-pie {
+  position: sticky;
+  bottom: 0;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-top: 2px;
+  border: 1px solid var(--linea);
+  border-radius: 14px;
+  background: var(--sup);
+  box-shadow: 0 -8px 24px rgb(0 0 0 / 0.25);
+}
+.ago-pie[data-visible] { display: flex; flex-wrap: wrap; justify-content: flex-end; }
+.ago-pie small { flex: 1 1 100%; min-width: 0; font-weight: 700; font-size: 13px; }
+.ago-pie .btn { flex: 1; }
+
+/* Botón con contador (salón y cocina). */
+.ago-boton { gap: 6px; flex: none; }
+.ago-boton[data-hay] { color: var(--rosa-tinta); border-color: color-mix(in srgb, var(--rosa-tinta) 40%, transparent); }
+.ago-num {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 99px;
+  display: inline-grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 900;
+  background: var(--rosa-tinta);
+  color: var(--sup);
+}
+
+/* Inventario (próximamente). */
+.ago-pronto { display: grid; justify-items: center; text-align: center; gap: 8px; padding: 28px 18px; }
+.ago-pronto-icono {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: var(--lavanda);
+  color: #d4a72c;
+}

@@ -10,6 +10,7 @@ import Icono from './iconos'
 import './orden.css'
 import { esPropio, estaAgotado, hoyEn, useHoy } from './agotado'
 import { ordenarNombre } from './orden'
+import Agotados from './Agotados'
 
 // Pedidos para llevar: no tienen mesa, se identifican como "Llevar 3" (y el nombre del cliente, si se pidió).
 const esLlevar = (p) => p?.llevar_numero != null
@@ -292,7 +293,10 @@ export default function Mesera({ restaurante, rol = 'mesera', cajaDe = null }) {
   const panelMesas = (
     <div className={ancho ? 'aparece' : vista.atras ? 'entra-izquierda' : 'aparece'}>
       <div style={s.cabeceraMesas}>
-        <h2 style={{ margin: 0 }}>Mesas</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <h2 style={{ margin: 0 }}>Mesas</h2>
+          <Agotados restaurante={restaurante} />
+        </div>
         {datos.mesas.length > 0 && (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <span style={{ ...s.pastilla, background: 'var(--durazno)', color: 'var(--aviso-tinta)' }}>

@@ -251,3 +251,57 @@
     animation: none;
   }
 }
+
+/* ===== Plan pagado: tarjeta fija + beneficios (sin animaciones) ===== */
+.mp-activo {
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid #3a2e12;
+  background: linear-gradient(160deg, #17130a 0%, #0d0d0d 70%);
+  color: #f5f5f4;
+}
+.mp-oro { color: #e3c46b; font-weight: 800; letter-spacing: -0.01em; }
+.mp-ok {
+  padding: 4px 11px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 800;
+  background: #0f2a1a;
+  color: #4ade80;
+  border: 1px solid #1f4d31;
+}
+.mp-gracias { margin: 0; font-size: 15px; line-height: 1.4; color: #e7e5e4; }
+.mp-hasta { color: #a3a3a3; }
+.mp-hasta b { color: #f5f5f4; }
+
+.mp-incluye { display: grid; gap: 12px; }
+.mp-beneficios {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.mp-beneficio {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--linea);
+  background: var(--sup);
+}
+.mp-beneficio b { font-size: 14px; font-weight: 700; }
+.mp-beneficio small { font-size: 12.5px; line-height: 1.35; color: var(--suave); }
+.mp-b-ic {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-bottom: 4px;
+  border-radius: 10px;
+  background: #1f1a0c;
+  color: #e3c46b;
+  border: 1px solid #3a2e12;
+}
+:root:not([data-tema='oscuro']) .mp-b-ic { background: #fdf6e3; border-color: #f3e1b5; color: #a16207; }

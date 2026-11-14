@@ -3,6 +3,7 @@ import Icono from './iconos'
 import { supabase } from './supabase'
 import { audioCtx, audioDesbloqueado, escucharAudio, sentir } from './feedback'
 import { Cargando, Desplegable, Mensaje } from './ui'
+import Agotados from './Agotados'
 
 const TIPOS_ANULACION = ['anulacion', 'anulacion_total']
 
@@ -177,7 +178,10 @@ export default function Cocina({ restaurante }) {
     <div>
       <div style={s.cabecera}>
         <div>
-          <h2 style={{ margin: 0 }}>Cocina</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <h2 style={{ margin: 0 }}>Cocina</h2>
+            <Agotados restaurante={restaurante} soloPlatos />
+          </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
             <span style={{ ...s.pastilla, background: 'var(--durazno)', color: 'var(--aviso-tinta)' }}>
               <b key={tickets.length} className="contador-pop">

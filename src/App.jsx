@@ -1,6 +1,5 @@
 import { BotonTema } from './tema'
 import Icono from './iconos'
-import Agotados from './Agotados'
 import { quitarColores } from './paletas'
 import Bienvenida, { guiaYaVista, marcarGuiaVista } from './Bienvenida'
 import { useEffect, useState } from 'react'
@@ -202,10 +201,7 @@ function Panel({ sesion }) {
   const subtitulo = perfil?.es_superadmin ? (
     <span className="oro-texto">Superadmin Pro</span>
   ) : miembro ? (
-    <>
-      {miembro.restaurantes.nombre} ·{' '}
-      {pro ? <span className="oro-texto">{ROL_PRO[miembro.rol] ?? `${rolTexto} Pro`}</span> : rolTexto}
-    </>
+    pro ? <span className="oro-texto">{ROL_PRO[miembro.rol] ?? `${rolTexto} Pro`}</span> : rolTexto
   ) : (
     ''
   )
@@ -231,14 +227,6 @@ function Panel({ sesion }) {
             <b style={estilos.marca}>{perfil ? perfil.nombre : MARCA}</b>
             <small style={estilos.sub}>{perfil ? subtitulo || MARCA : ' '}</small>
           </div>
-          {miembro && ['admin', 'mesera', 'cocina'].includes(miembro.rol) && (
-            <Agotados restaurante={miembro.restaurantes} soloPlatos={miembro.rol === 'cocina'} />
-          )}
-          {miembro && !perfil?.es_superadmin && (
-            <button className="btn btn-chico btn-sec" style={{ width: 40, padding: 0, flex: 'none' }} aria-label="Ayuda: ver la guía" title="Ayuda" onClick={() => { sentir('toque'); setGuia(true) }}>
-              <Icono n="ayuda" tam={18} />
-            </button>
-          )}
           <BotonTema />
           <button
             className="btn btn-chico"

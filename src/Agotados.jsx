@@ -2,34 +2,36 @@ import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from './supabase'
 import { avisar, sentir, sonar, vibrar } from './feedback'
-import { Desplegable, Interruptor, Mensaje } from './ui'
+import { Mensaje, Segmento } from './ui'
 import Icono from './iconos'
 import { estaAgotado, marcarPropio, useHoy } from './agotado'
 import { ordenarNombre } from './orden'
+import './agotados.css'
 
-// Botón "Agotados" + panel para marcar qué se acabó hoy. Lo usan el Salón y la Cocina.
-// No edita el menú: solo apaga un plato por hoy (mañana vuelve solo).
+// =============================================================================================
+// AGOTADOS DE HOY
+// - A la vista solo están los agotados; los demás platos se buscan con la lupa.
+// - Se marcan o desmarcan varios a la vez y recién al tocar «Guardar» se envía todo junto
+//   (una sola llamada a la base, en vez de una por cada toque).
+// - No edita el menú: el plato vuelve solo mañana.
 // soloPlatos: la cocina solo controla los platos; bebidas y postres los marca el salón.
-export default function Agotados({ restaurante, soloPlatos = false }) {
+// =============================================================================================
+
+const MAX_RESULTADOS = 25
+
+// Carga los productos y escucha cambios de otros equipos (con una pausa para juntar varios avisos).
+function useAgotados(restaurante, soloPlatos) {
   const hoy = useHoy(restaurante.zona_horaria)
-  const [abierto, setAbierto] = useState(false)
   const [prods, setProds] = useState(null)
   const [cats, setCats] = useState([])
-  const [buscar, setBuscar] = useState('')
   const [error, setError] = useState('')
-  const [ocupados, setOcupados] = useState(() => new Set())
   const temporizador = useRef(null)
 
   const cargar = useCallback(async () => {
     const rid = restaurante.id
     const [c, p] = await Promise.all([
       supabase.from('categorias').select('id, nombre, orden, tipo').eq('restaurante_id', rid).eq('activo', true).order('orden'),
-      supabase
-        .from('productos')
-        .select('id, nombre, categoria_id, agotado_dia')
-        .eq('restaurante_id', rid)
-        .eq('activo', true)
-        .order('nombre'),
+      supabase.from('productos').select('id, nombre, categoria_id, agotado_dia').eq('restaurante_id', rid).eq('activo', true).order('nombre'),
     ])
     const fallo = c.error || p.error
     if (fallo) {
@@ -45,16 +47,12 @@ export default function Agotados({ restaurante, soloPlatos = false }) {
     cargar()
     const programar = () => {
       clearTimeout(temporizador.current)
-      temporizador.current = setTimeout(cargar, 250)
+      temporizador.current = setTimeout(cargar, 600)
     }
     // Nombre único: la misma pantalla puede estar montada dos veces (Salón y Cocina del administrador).
     const canal = supabase
       .channel(`agotados-${restaurante.id}-${Math.random().toString(36).slice(2, 8)}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'productos', filter: `restaurante_id=eq.${restaurante.id}` },
-        programar
-      )
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'productos', filter: `restaurante_id=eq.${restaurante.id}` }, programar)
       .subscribe()
     return () => {
       clearTimeout(temporizador.current)
@@ -65,188 +63,241 @@ export default function Agotados({ restaurante, soloPlatos = false }) {
   const catsPorId = useMemo(() => new Map(cats.map((c) => [c.id, c])), [cats])
   // Solo productos de categorías activas (los demás no aparecen en el salón de todas formas).
   const lista = useMemo(() => (prods ?? []).filter((p) => catsPorId.has(p.categoria_id)), [prods, catsPorId])
-  const agotados = lista.filter((p) => estaAgotado(p, hoy))
+  const agotados = useMemo(() => lista.filter((p) => estaAgotado(p, hoy)), [lista, hoy])
 
-  const filtro = buscar.trim().toLowerCase()
-  const visibles = filtro ? lista.filter((p) => p.nombre.toLowerCase().includes(filtro)) : lista
+  return { hoy, prods, setProds, lista, agotados, catsPorId, error, setError, cargar }
+}
 
-  async function cambiar(p, valor) {
-    setError('')
-    marcarPropio(p.id)
-    setOcupados((o) => new Set(o).add(p.id))
-    // Se refleja al instante; si algo falla, se vuelve a cargar la verdad.
-    setProds((ps) => ps.map((x) => (x.id === p.id ? { ...x, agotado_dia: valor ? hoy : null } : x)))
-    const { error } = await supabase.rpc('marcar_agotado', { p_producto: p.id, p_agotado: valor })
-    setOcupados((o) => {
-      const n = new Set(o)
-      n.delete(p.id)
+const sinTildes = (t) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+
+// Lista con buscador y botón Guardar. La usan la hoja (salón y cocina) y la sección del administrador.
+function ListaAgotados({ datos, soloPlatos, onGuardado }) {
+  const { hoy, prods, setProds, lista, agotados, catsPorId, error, setError } = datos
+  const [buscar, setBuscar] = useState('')
+  // Cambios sin guardar: id del producto -> true (agotar) / false (volver a ofrecer).
+  const [cambios, setCambios] = useState(() => new Map())
+  const [guardando, setGuardando] = useState(false)
+
+  const quiere = (p) => (cambios.has(p.id) ? cambios.get(p.id) : estaAgotado(p, hoy))
+
+  function alternar(p) {
+    sentir('toque', 'tic')
+    setCambios((m) => {
+      const n = new Map(m)
+      const nuevo = !quiere(p)
+      if (nuevo === estaAgotado(p, hoy)) n.delete(p.id)
+      else n.set(p.id, nuevo)
       return n
     })
+  }
+
+  const filtro = sinTildes(buscar.trim())
+  const resultados = useMemo(() => {
+    if (!filtro) return []
+    return lista.filter((p) => sinTildes(p.nombre).includes(filtro))
+  }, [lista, filtro])
+
+  // Sin búsqueda: los agotados de hoy más los que se acaban de elegir para agotar.
+  const enVista = useMemo(() => {
+    const ids = new Set(agotados.map((p) => p.id))
+    for (const [id, v] of cambios) if (v) ids.add(id)
+    return lista.filter((p) => ids.has(p.id))
+  }, [agotados, cambios, lista])
+
+  const nAgotar = [...cambios.values()].filter(Boolean).length
+  const nVolver = cambios.size - nAgotar
+
+  async function guardar() {
+    if (!cambios.size || guardando) return
+    setGuardando(true)
+    setError('')
+    const agotar = [...cambios].filter(([, v]) => v).map(([id]) => id)
+    const reponer = [...cambios].filter(([, v]) => !v).map(([id]) => id)
+    cambios.forEach((_, id) => marcarPropio(id))
+    const { error } = await supabase.rpc('marcar_agotados', { p_agotar: agotar, p_reponer: reponer })
+    setGuardando(false)
     if (error) {
       setError(error.message)
       sonar('error')
-      cargar()
       return
     }
-    if (valor) {
+    // Se refleja al instante; el aviso en vivo de los demás equipos llega solo.
+    setProds((ps) => ps.map((x) => (cambios.has(x.id) ? { ...x, agotado_dia: cambios.get(x.id) ? hoy : null } : x)))
+    setCambios(new Map())
+    setBuscar('')
+    if (agotar.length) {
       vibrar('aviso')
       sonar('baja')
-      avisar(`${p.nombre} · agotado por hoy`, 'agotado')
-    } else {
-      sonar('pop')
-      avisar(`${p.nombre} · disponible de nuevo`, 'ok')
-    }
+    } else sonar('pop')
+    const partes = []
+    if (agotar.length) partes.push(`${agotar.length} agotado${agotar.length === 1 ? '' : 's'}`)
+    if (reponer.length) partes.push(`${reponer.length} disponible${reponer.length === 1 ? '' : 's'} de nuevo`)
+    avisar(`Guardado · ${partes.join(' · ')}`, agotar.length ? 'agotado' : 'ok')
+    onGuardado?.()
   }
 
   const fila = (p) => {
-    const agot = estaAgotado(p, hoy)
+    const marcado = quiere(p)
+    const pendiente = cambios.has(p.id)
+    const cat = catsPorId.get(p.categoria_id)
     return (
-      <div key={p.id} style={{ ...s.fila, ...(agot ? s.filaAgotada : null) }}>
-        <Interruptor alerta checked={agot} disabled={ocupados.has(p.id)} onChange={(v) => cambiar(p, v)}>
-          <span style={{ fontWeight: agot ? 800 : 600, color: agot ? 'var(--rosa-tinta)' : 'inherit' }}>{p.nombre}</span>
-        </Interruptor>
-      </div>
+      <button key={p.id} type="button" className="ago-fila" data-marcado={marcado || undefined} data-pendiente={pendiente || undefined} onClick={() => alternar(p)} aria-pressed={marcado}>
+        <span className="ago-check" aria-hidden="true">{marcado && <Icono n="prohibido" tam={14} ancho={2.4} />}</span>
+        <span className="ago-nombre">
+          <b>{p.nombre}</b>
+          {cat && <small>{cat.nombre}</small>}
+        </span>
+        {pendiente ? (
+          <span className={`ago-chip ${marcado ? 'rojo' : 'verde'}`}>{marcado ? 'Se agotará' : 'Volverá'}</span>
+        ) : marcado ? (
+          <span className="ago-chip rojo">Agotado</span>
+        ) : null}
+      </button>
     )
   }
 
-  // Un grupo por tipo de producto (entrada, plato, bebida…): cada uno se abre aparte.
-  const grupos = useMemo(() => {
-    const g = new Map()
-    for (const c of cats) {
-      const tipo = c.tipo ?? 'plato'
-      const items = lista.filter((p) => p.categoria_id === c.id)
-      if (!items.length) continue
-      const x = g.get(tipo) ?? { tipo, items: [] }
-      x.items.push(...items)
-      g.set(tipo, x)
-    }
-    return [...g.values()]
-  }, [cats, lista])
+  return (
+    <div className="ago">
+      <Mensaje tipo="error">{error}</Mensaje>
+      <label className="ago-buscar">
+        <Icono n="buscar" tam={18} />
+        <input type="search" placeholder="Buscar un plato para agotar…" value={buscar} onChange={(e) => setBuscar(e.target.value)} aria-label="Buscar producto" />
+        {buscar && (
+          <button type="button" className="ago-limpiar" aria-label="Borrar búsqueda" onClick={() => setBuscar('')}>
+            <Icono n="cerrar" tam={16} />
+          </button>
+        )}
+      </label>
 
-  const [grupoAbierto, setGrupoAbierto] = useState(null)
+      {!prods && <small className="suave">Cargando…</small>}
+      {prods && lista.length === 0 && <small className="suave">Todavía no hay productos en el menú.</small>}
+
+      {filtro ? (
+        <div className="ago-lista">
+          <small className="ago-sec">
+            {resultados.length ? `${resultados.length} resultado${resultados.length === 1 ? '' : 's'}` : 'Sin resultados'}
+          </small>
+          {resultados.slice(0, MAX_RESULTADOS).map(fila)}
+          {resultados.length > MAX_RESULTADOS && <small className="suave">Hay más: escribe un poco más del nombre.</small>}
+          {resultados.length === 0 && <small className="suave">No encontré «{buscar.trim()}» en el menú.</small>}
+        </div>
+      ) : (
+        prods && lista.length > 0 && (
+          <div className="ago-lista">
+            <small className="ago-sec" style={{ color: enVista.length ? 'var(--rosa-tinta)' : undefined }}>
+              {agotados.length ? `Agotados hoy · ${agotados.length}` : 'Nada agotado por ahora'}
+            </small>
+            {enVista.map(fila)}
+            {enVista.length === 0 && (
+              <small className="suave">Busca con la lupa el plato que se acabó y márcalo. Mañana vuelve solo.</small>
+            )}
+          </div>
+        )
+      )}
+
+      {soloPlatos && <small className="suave">Las bebidas y los postres los marca el salón.</small>}
+
+      <div className="ago-pie" data-visible={cambios.size > 0 || undefined}>
+        <small>
+          {nAgotar > 0 && <span style={{ color: 'var(--rosa-tinta)' }}>{nAgotar} por agotar</span>}
+          {nAgotar > 0 && nVolver > 0 && ' · '}
+          {nVolver > 0 && <span style={{ color: 'var(--menta-tinta)' }}>{nVolver} por reponer</span>}
+        </small>
+        <button type="button" className="btn btn-chico btn-sec" disabled={guardando} onClick={() => setCambios(new Map())}>
+          Descartar
+        </button>
+        <button type="button" className="btn btn-chico btn-principal" disabled={guardando} onClick={guardar}>
+          {guardando ? 'Guardando…' : `Guardar${cambios.size > 1 ? ` (${cambios.size})` : ''}`}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Botón «Agotados» con el número de hoy; abre la hoja. Lo usan el Salón y la Cocina.
+export default function Agotados({ restaurante, soloPlatos = false }) {
+  const datos = useAgotados(restaurante, soloPlatos)
+  const [abierto, setAbierto] = useState(false)
+  const n = datos.agotados.length
 
   return (
     <>
       <button
-        className="btn btn-chico btn-sec"
-        style={{ position: 'relative', width: 40, padding: 0, flex: 'none' }}
-        aria-label={`Agotados${agotados.length ? `: ${agotados.length}` : ''}`}
-        title="Agotados"
+        type="button"
+        className="btn btn-chico btn-sec ago-boton"
+        data-hay={n > 0 || undefined}
+        aria-label={`Agotados${n ? `: ${n}` : ''}`}
         onClick={() => {
           sentir('toque', 'tic')
-          cargar()
+          datos.cargar()
           setAbierto(true)
         }}
       >
-        <Icono n="prohibido" tam={18} />
-        {agotados.length > 0 && (
-          <b key={agotados.length} className="contador-pop" style={s.globito}>
-            {agotados.length}
+        <Icono n="prohibido" tam={15} />
+        Agotados
+        {n > 0 && (
+          <b key={n} className="contador-pop ago-num">
+            {n}
           </b>
         )}
       </button>
 
-      {abierto && createPortal(
-        <div className="hoja-velo funde" onClick={() => setAbierto(false)}>
-          <div className="hoja sube" role="dialog" aria-modal="true" aria-label="Agotados de hoy" onClick={(e) => e.stopPropagation()}>
-            <div className="hoja-asa" aria-hidden="true" />
-            <div className="hoja-cab">
-              <h3 style={{ margin: 0 }}>¿Se acabó algo hoy?</h3>
-              <button className="btn btn-chico btn-sec" style={{ width: 40, padding: 0 }} aria-label="Cerrar" onClick={() => setAbierto(false)}>
-                <Icono n="cerrar" tam={18} />
-              </button>
+      {abierto &&
+        createPortal(
+          <div className="hoja-velo funde" onClick={() => setAbierto(false)}>
+            <div className="hoja sube" role="dialog" aria-modal="true" aria-label="Agotados de hoy" onClick={(e) => e.stopPropagation()}>
+              <div className="hoja-asa" aria-hidden="true" />
+              <div className="hoja-cab">
+                <h3 style={{ margin: 0 }}>Agotados de hoy</h3>
+                <button className="btn btn-chico btn-sec" style={{ width: 40, padding: 0 }} aria-label="Cerrar" onClick={() => setAbierto(false)}>
+                  <Icono n="cerrar" tam={18} />
+                </button>
+              </div>
+              <div className="hoja-cuerpo" style={{ paddingBottom: 'calc(18px + var(--seguro-abajo))' }}>
+                <ListaAgotados datos={datos} soloPlatos={soloPlatos} />
+              </div>
             </div>
-            <div className="hoja-cuerpo" style={{ paddingBottom: 'calc(18px + var(--seguro-abajo))' }}>
-              <small className="suave">
-                Enciende lo que se acabó y desaparece del menú del salón. Mañana vuelve solo.
-                {soloPlatos ? ' Las bebidas y los postres los marca el salón.' : ''}
-              </small>
-              <Mensaje tipo="error">{error}</Mensaje>
-              {!prods && <small className="suave">Cargando…</small>}
-              {prods && lista.length === 0 && <small className="suave">Todavía no hay productos en el menú.</small>}
-
-              {lista.length > 0 && (
-                <input
-                  className="campo-chico"
-                  type="search"
-                  placeholder="Buscar producto…"
-                  value={buscar}
-                  onChange={(e) => setBuscar(e.target.value)}
-                />
-              )}
-
-              {filtro ? (
-                <div style={{ display: 'grid', gap: 2 }}>
-                  {visibles.map(fila)}
-                  {visibles.length === 0 && <small className="suave">No encontré ese producto.</small>}
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gap: 8 }}>
-                  {/* Línea fija (siempre ocupa el mismo alto): así la lista no salta al marcar o desmarcar */}
-                  <small style={{ ...s.seccion, color: agotados.length ? 'var(--rosa-tinta)' : 'var(--suave)', minHeight: 20 }}>
-                    {agotados.length ? `Agotados hoy · ${agotados.length}` : 'Nada agotado por ahora'}
-                  </small>
-                  {grupos.map((g) => {
-                    const abierto = grupoAbierto === g.tipo
-                    const n = g.items.filter((p) => estaAgotado(p, hoy)).length
-                    return (
-                      <div key={g.tipo} style={s.grupo}>
-                        <button
-                          style={s.grupoCab}
-                          aria-expanded={abierto}
-                          onClick={() => {
-                            sentir('toque', 'tic')
-                            setGrupoAbierto(abierto ? null : g.tipo)
-                          }}
-                        >
-                          <b style={{ flex: 1, textAlign: 'left' }}>{TIPOS[g.tipo] ?? g.tipo}</b>
-                          {n > 0 && <span style={s.contador}>{n} agotado{n === 1 ? '' : 's'}</span>}
-                          <small className="suave">{g.items.length}</small>
-                          <span aria-hidden="true" style={{ ...s.flecha, transform: abierto ? 'rotate(180deg)' : 'none' }}>▾</span>
-                        </button>
-                        <Desplegable abierto={abierto}>
-                          <div style={{ display: 'grid', gap: 2, padding: '0 8px 8px' }}>
-                            {g.items.map((p) => fila(p))}
-                          </div>
-                        </Desplegable>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          </div>,
+          document.body
+        )}
     </>
   )
 }
 
-const TIPOS = { plato: 'Platos', postre: 'Postres', bebida: 'Bebidas', otro: 'Otros' }
-
-const s = {
-  globito: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    minWidth: 20,
-    height: 20,
-    padding: '0 5px',
-    borderRadius: 99,
-    display: 'grid',
-    placeItems: 'center',
-    fontSize: 11,
-    fontWeight: 900,
-    background: 'var(--rosa-tinta)',
-    color: 'var(--sobre-rosa)',
-    border: '2px solid var(--sup)',
-  },
-  contador: { padding: '2px 8px', borderRadius: 99, background: 'var(--rosa)', color: 'var(--rosa-tinta)', fontSize: 12, fontWeight: 800 },
-  flecha: { fontSize: 12, transition: 'transform 260ms var(--ease)', display: 'inline-block' },
-  grupo: { border: '1px solid var(--linea)', borderRadius: 16, background: 'var(--lavanda)', overflow: 'hidden' },
-  grupoCab: { all: 'unset', boxSizing: 'border-box', width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '14px 14px', cursor: 'pointer', fontSize: 16 },
-  seccion: { fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase', fontSize: 12, color: 'var(--suave)', padding: '4px 2px' },
-  fila: { padding: '0 10px', borderRadius: 12 },
-  filaAgotada: { background: 'var(--rosa)' },
+// Sección del administrador: «Agotados e inventario».
+export function AgotadosInventario({ restaurante }) {
+  const datos = useAgotados(restaurante, false)
+  const [vista, setVista] = useState('agotados')
+  return (
+    <div style={{ display: 'grid', gap: 14 }}>
+      <div>
+        <h2 style={{ margin: 0 }}>Agotados e inventario</h2>
+        <small className="suave">Lo que marques aquí desaparece del salón y de la carta QR por hoy.</small>
+      </div>
+      <Segmento
+        etiqueta="Ver"
+        valor={vista}
+        onChange={setVista}
+        opciones={[
+          ['agotados', `Agotados${datos.agotados.length ? ` · ${datos.agotados.length}` : ''}`],
+          ['inventario', 'Inventario'],
+        ]}
+      />
+      {vista === 'agotados' ? (
+        <section className="tarjeta">
+          <ListaAgotados datos={datos} />
+        </section>
+      ) : (
+        <section className="tarjeta ago-pronto">
+          <span className="ago-pronto-icono" aria-hidden="true">
+            <Icono n="caja" tam={26} />
+          </span>
+          <b>Inventario · próximamente</b>
+          <small className="suave">
+            Aquí vas a llevar el stock de tus insumos y bebidas, y el sistema te avisará cuando algo se esté acabando.
+          </small>
+        </section>
+      )}
+    </div>
+  )
 }
