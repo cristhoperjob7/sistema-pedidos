@@ -1131,3 +1131,67 @@ select,
 textarea {
   font-size: max(16px, 1em);
 }
+
+/* ============================================================================================
+   Dorado "Pro": texto con un brillo que lo recorre cada pocos segundos, y aro dorado en el ícono del perfil.
+   ============================================================================================ */
+.oro-texto {
+  font-weight: 700;
+  background: linear-gradient(100deg, #92400e 0%, #b45309 30%, #f59e0b 45%, #fbbf24 50%, #f59e0b 55%, #b45309 70%, #92400e 100%);
+  background-size: 250% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: brillo-oro 3.6s ease-in-out infinite;
+}
+:root[data-tema='oscuro'] .oro-texto {
+  background-image: linear-gradient(100deg, #f59e0b 0%, #fbbf24 30%, #fef3c7 46%, #ffffff 50%, #fef3c7 54%, #fbbf24 70%, #f59e0b 100%);
+}
+@keyframes brillo-oro {
+  0%,
+  55% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0% 0;
+  }
+}
+.oro-aro {
+  position: relative;
+  border-color: transparent !important;
+  background:
+    linear-gradient(var(--lavanda), var(--lavanda)) padding-box,
+    linear-gradient(120deg, #b45309, #fbbf24, #fef3c7, #fbbf24, #b45309) border-box !important;
+  background-size: 100% 100%, 300% 300% !important;
+  border: 2px solid transparent !important;
+  box-shadow: 0 0 12px -2px rgba(245, 158, 11, 0.45);
+  animation: aro-oro 3.6s ease-in-out infinite;
+}
+@keyframes aro-oro {
+  0%,
+  100% {
+    background-position: 0 0, 0% 50%;
+  }
+  50% {
+    background-position: 0 0, 100% 50%;
+  }
+}
+.oro-corona {
+  position: absolute;
+  right: -7px;
+  bottom: -7px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--sup);
+  box-shadow: 0 0 0 1px var(--linea);
+}
+@media (prefers-reduced-motion: reduce) {
+  .oro-texto,
+  .oro-aro {
+    animation: none;
+  }
+}

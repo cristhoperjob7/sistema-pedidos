@@ -77,3 +77,6 @@ export function avisoPlan(p) {
   if (p.estado === 'moroso') return { tono: 'error', texto: 'Tu plan está vencido: el sistema quedó solo para consultar. Paga para volver a usarlo.' }
   return null
 }
+
+// El local tiene insignia dorada "Pro" si está al día (o es piloto, o el cobro todavía no está encendido).
+export const planPro = (p) => !!p && ['libre', 'piloto', 'al_dia', 'por_vencer'].includes(p.estado)

@@ -4,7 +4,9 @@ import { supabase } from './supabase'
 import { Mensaje } from './ui'
 import { avisar, sentir } from './feedback'
 import { subirComprobante } from './imagenes'
-import { ESTADOS_PLAN, estiloTono, fechaPlan, planBloqueado, usePlan } from './plan'
+import { estiloTono, fechaPlan, planBloqueado, planPro, usePlan } from './plan'
+import { Corona } from './marca'
+import './plan.css'
 
 const pesos = (n) => `$${Math.round(Number(n) || 0).toLocaleString('es-CL')}`
 
@@ -21,13 +23,27 @@ export function BloqueoPlan({ restaurante, children }) {
   )
 }
 
+// Los datos para transferir los escribe el superadmin, una línea por dato: «Titular: Juan Pérez».
+function leerDatos(texto) {
+  return String(texto ?? '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((l) => {
+      const i = l.indexOf(':')
+      return i > 0 ? { etiqueta: l.slice(0, i).trim(), valor: l.slice(i + 1).trim() } : { etiqueta: '', valor: l }
+    })
+}
+
+const DIAS_PERIODO = 30
+
 // «Mi plan»: lo ve el administrador del local cuando el cobro está encendido (y el local no es piloto).
-// Muestra cuánto le queda, los datos para transferir y un formulario para informar el pago.
+// Muestra su plan, los datos para transferir y 3 pasos simples para avisar que pagó (el monto ya viene fijo).
 export default function MiPlan({ restaurante, plan }) {
   const [pagos, setPagos] = useState(null)
   const [operacion, setOperacion] = useState('')
-  const [monto, setMonto] = useState('')
   const [foto, setFoto] = useState(null)
+  const [vista, setVista] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
   const archivo = useRef(null)
@@ -46,22 +62,30 @@ export default function MiPlan({ restaurante, plan }) {
     cargarPagos()
   }, [restaurante.id])
 
+  // Vista previa de la foto elegida.
   useEffect(() => {
-    if (plan?.precio && !monto) setMonto(String(Math.round(plan.precio)))
-  }, [plan?.precio])
+    if (!foto) return setVista('')
+    const url = URL.createObjectURL(foto)
+    setVista(url)
+    return () => URL.revokeObjectURL(url)
+  }, [foto])
 
   if (!plan) return null
-  const est = ESTADOS_PLAN[plan.estado] ?? ESTADOS_PLAN.libre
-  const d = plan.dias
+  const pro = planPro(plan)
+  const malo = ['atrasado', 'moroso'].includes(plan.estado)
+  const d = plan.dias ?? 0
+  const usados = Math.max(0, Math.min(DIAS_PERIODO, DIAS_PERIODO - d))
+  const datos = leerDatos(plan.datos_pago)
   const pendiente = (pagos ?? []).find((p) => p.estado === 'pendiente')
+  const precio = Number(plan.precio) || 0
 
-  async function copiar() {
+  async function copiar(texto, que) {
     try {
-      await navigator.clipboard.writeText(plan.datos_pago ?? '')
+      await navigator.clipboard.writeText(texto)
       sentir('ok')
-      avisar('Datos copiados')
+      avisar(`${que} copiado`)
     } catch {
-      setError('No se pudo copiar. Puedes escribirlos a mano.')
+      setError('No se pudo copiar. Puedes escribirlo a mano.')
     }
   }
 
@@ -69,16 +93,14 @@ export default function MiPlan({ restaurante, plan }) {
     e.preventDefault()
     setError('')
     const op = operacion.trim()
-    const m = Number(String(monto).replace(/\D/g, ''))
     if (op.length < 3) return setError('Escribe el número de operación que aparece en tu comprobante.')
-    if (!m) return setError('Escribe el monto que transferiste.')
     setEnviando(true)
     try {
       const ruta = foto ? await subirComprobante(restaurante.id, foto) : null
       const { error: err } = await supabase.rpc('informar_pago_plan', {
         p_restaurante: restaurante.id,
         p_operacion: op,
-        p_monto: m,
+        p_monto: precio,
         p_foto: ruta,
       })
       if (err) {
@@ -86,7 +108,7 @@ export default function MiPlan({ restaurante, plan }) {
         throw new Error(err.message)
       }
       sentir('ok')
-      avisar('Pago informado. Te avisaremos cuando esté revisado.')
+      avisar('¡Listo! Te avisamos apenas revisemos tu pago.')
       setOperacion('')
       setFoto(null)
       if (archivo.current) archivo.current.value = ''
@@ -99,88 +121,157 @@ export default function MiPlan({ restaurante, plan }) {
     }
   }
 
+  const titulo = plan.estado === 'prueba' ? 'Prueba gratis' : 'ReSystem Pro'
+  const linea =
+    plan.estado === 'moroso'
+      ? 'Tu plan venció: el sistema quedó solo para consultar.'
+      : plan.estado === 'atrasado'
+        ? `Venció el ${fechaPlan(plan.vence)}. Paga antes del ${fechaPlan(plan.bloqueo)} para no perder el acceso.`
+        : plan.estado === 'prueba'
+          ? `Tu prueba termina el ${fechaPlan(plan.vence)}`
+          : `Renueva el ${fechaPlan(plan.vence)}`
+
   return (
-    <div style={{ display: 'grid', gap: 14 }}>
+    <div className="mp">
       <div>
         <h2 style={{ margin: 0 }}>Mi plan</h2>
-        <small className="suave">Plan mensual del sistema: mesas, cocina, caja, carta QR y reportes.</small>
+        <small className="suave">Mesas, cocina, caja, carta QR y reportes, sin límite de usuarios.</small>
       </div>
 
-      <section className="tarjeta" style={{ display: 'grid', gap: 8 }}>
-        <span style={{ ...estiloTono(est.tono), justifySelf: 'start' }}>{est.texto}</span>
-        <b style={{ fontSize: 26, lineHeight: 1.15 }}>
-          {plan.estado === 'moroso'
-            ? 'Solo para consultar'
-            : d == null
-              ? '—'
-              : d < 0
-                ? `Venció hace ${-d} ${d === -1 ? 'día' : 'días'}`
-                : d === 0
-                  ? 'Vence hoy'
-                  : `Quedan ${d} ${d === 1 ? 'día' : 'días'}`}
-        </b>
-        <small className="suave">
-          {plan.estado === 'prueba' && `Tu prueba gratis termina el ${fechaPlan(plan.vence)}.`}
-          {['al_dia', 'por_vencer'].includes(plan.estado) && `Pagado hasta el ${fechaPlan(plan.vence)}.`}
-          {plan.estado === 'atrasado' && `Venció el ${fechaPlan(plan.vence)}. Desde el ${fechaPlan(plan.bloqueo)} el sistema queda solo para consultar.`}
-          {plan.estado === 'moroso' && 'Tus datos están guardados. Ves el historial y los reportes, pero no puedes tomar pedidos hasta pagar.'}
-        </small>
-      </section>
-
-      <section className="tarjeta" style={{ display: 'grid', gap: 10 }}>
-        <small className="suave">Plan Restaurante</small>
-        <b style={{ fontSize: 26 }}>
-          {pesos(plan.precio)} <small className="suave" style={{ fontSize: 14 }}>/ mes</small>
-        </b>
-        {plan.datos_pago ? (
+      {/* Tarjeta del plan */}
+      <section className={`mp-tarjeta${malo ? ' malo' : ''}`}>
+        <div className="mp-fila">
+          <span className="mp-plan">
+            {pro || plan.estado === 'prueba' ? <Corona tam={20} /> : null}
+            <span className={pro ? 'oro-texto' : undefined}>{titulo}</span>
+          </span>
+          <small className="suave">{linea}</small>
+        </div>
+        <div>
+          <div className="mp-etq">Tu mensualidad</div>
+          <div className="mp-monto">{pesos(precio)}</div>
+        </div>
+        {plan.estado !== 'moroso' && (
           <>
-            <small className="suave">Transfiere a:</small>
-            <p style={{ margin: 0, whiteSpace: 'pre-line', lineHeight: 1.5 }}>{plan.datos_pago}</p>
-            <button type="button" className="btn btn-sec btn-chico" style={{ justifySelf: 'start' }} onClick={copiar}>
-              <Icono n="copiar" tam={16} className="it" /> Copiar datos
-            </button>
+            <div className="mp-barra" aria-hidden="true">
+              <i style={{ width: `${(usados / DIAS_PERIODO) * 100}%` }} />
+            </div>
+            <small className="suave">
+              {d >= 0 ? `Quedan ${d} ${d === 1 ? 'día' : 'días'}` : `Venció hace ${-d} ${d === -1 ? 'día' : 'días'}`}
+            </small>
           </>
-        ) : (
-          <small className="suave">Pronto verás aquí los datos para transferir.</small>
         )}
       </section>
 
-      <section className="tarjeta" style={{ display: 'grid', gap: 12 }}>
-        <b>Informar mi pago</b>
-        {pendiente ? (
-          <p className="msj" style={{ margin: 0, background: 'var(--durazno)', color: 'var(--aviso-tinta)' }}>
-            Recibimos tu pago de {pesos(pendiente.monto)} (operación {pendiente.operacion}). Lo estamos revisando; normalmente queda listo el mismo día.
-          </p>
-        ) : (
-          <form onSubmit={enviar} style={{ display: 'grid', gap: 12 }}>
-            <label className="etiqueta">
-              Número de operación
-              <input className="campo" inputMode="text" autoComplete="off" maxLength={40} value={operacion} onChange={(e) => setOperacion(e.target.value)} placeholder="Aparece en tu comprobante" />
-            </label>
-            <label className="etiqueta">
-              Monto transferido
-              <input className="campo" inputMode="numeric" maxLength={10} value={monto} onChange={(e) => setMonto(e.target.value.replace(/\D/g, ''))} />
-            </label>
-            <label className="etiqueta">
-              <span>Foto del comprobante <small className="suave" style={{ fontWeight: 500 }}>(opcional)</small></span>
-              <input ref={archivo} type="file" accept="image/*" onChange={(e) => setFoto(e.target.files?.[0] ?? null)} />
-              <small className="suave" style={{ fontWeight: 500 }}>Solo la vemos nosotros y se borra sola a los 60 días.</small>
-            </label>
-            <Mensaje tipo="error">{error}</Mensaje>
-            <button className="btn btn-principal" disabled={enviando}>
-              {enviando ? <span className="puntos">Enviando</span> : 'Informar pago'}
-            </button>
-          </form>
-        )}
-      </section>
+      {pendiente ? (
+        <section className="tarjeta mp-revision">
+          <span className="mp-reloj" aria-hidden="true">
+            <Icono n="reloj" tam={22} />
+          </span>
+          <div>
+            <b>Estamos revisando tu pago</b>
+            <p className="suave" style={{ margin: '4px 0 0' }}>
+              Recibimos tu aviso de {pesos(pendiente.monto)} (operación {pendiente.operacion}). Normalmente queda listo el mismo día.
+            </p>
+          </div>
+        </section>
+      ) : (
+        <form className="tarjeta mp-pasos" onSubmit={enviar}>
+          {/* Paso 1 */}
+          <div className="mp-paso">
+            <span className="mp-num">1</span>
+            <div className="mp-paso-in">
+              <b>Transfiere {pesos(precio)}</b>
+              <small className="suave">Desde la app de tu banco. Toca un dato para copiarlo.</small>
+              {datos.length === 0 ? (
+                <small className="suave">Pronto verás aquí los datos para transferir.</small>
+              ) : (
+                <>
+                  <div className="mp-datos">
+                    {datos.map((x, i) => (
+                      <button type="button" key={i} className="mp-dato" onClick={() => copiar(x.valor, x.etiqueta || 'Dato')}>
+                        {x.etiqueta && <small>{x.etiqueta}</small>}
+                        <b>{x.valor}</b>
+                        <span className="mp-copiar" aria-hidden="true">
+                          <Icono n="copiar" tam={15} />
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <button type="button" className="btn btn-sec btn-chico" style={{ justifySelf: 'start' }} onClick={() => copiar(datos.map((x) => (x.etiqueta ? `${x.etiqueta}: ${x.valor}` : x.valor)).join('\n') + `\nMonto: ${pesos(precio)}`, 'Datos')}>
+                    <Icono n="copiar" tam={15} className="it" /> Copiar todos los datos
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Paso 2 */}
+          <div className="mp-paso">
+            <span className="mp-num">2</span>
+            <div className="mp-paso-in">
+              <b>
+                Sube el comprobante <small className="suave" style={{ fontWeight: 500 }}>(opcional)</small>
+              </b>
+              <input ref={archivo} id="mp-foto" type="file" accept="image/*" className="mp-oculto" onChange={(e) => setFoto(e.target.files?.[0] ?? null)} />
+              {foto ? (
+                <div className="mp-elegida">
+                  {vista && <img src={vista} alt="Comprobante elegido" />}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <b className="mp-nombre">{foto.name}</b>
+                    <small className="suave">Listo para enviar</small>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-chico btn-sec"
+                    onClick={() => {
+                      setFoto(null)
+                      if (archivo.current) archivo.current.value = ''
+                    }}
+                  >
+                    Quitar
+                  </button>
+                </div>
+              ) : (
+                <label htmlFor="mp-foto" className="mp-subir">
+                  <span className="mp-subir-ic">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>
+                  </span>
+                  <span>
+                    <b>Toca para subir una foto o captura</b>
+                    <small className="suave">Solo la vemos nosotros · se borra sola a los 60 días</small>
+                  </span>
+                </label>
+              )}
+            </div>
+          </div>
+
+          {/* Paso 3 */}
+          <div className="mp-paso">
+            <span className="mp-num">3</span>
+            <div className="mp-paso-in">
+              <label htmlFor="mp-op">
+                <b>Escribe el número de operación</b>
+              </label>
+              <input id="mp-op" className="campo" autoComplete="off" maxLength={40} value={operacion} onChange={(e) => setOperacion(e.target.value)} placeholder="Aparece en tu comprobante · ej: 004412398" />
+              <Mensaje tipo="error">{error}</Mensaje>
+              <button className="mp-pagar" disabled={enviando}>
+                {enviando ? <span className="puntos">Enviando</span> : <>Ya pagué · {pesos(precio)}</>}
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
 
       {pagos?.length > 0 && (
         <section className="tarjeta" style={{ display: 'grid', gap: 2 }}>
           <b style={{ marginBottom: 6 }}>Mis pagos</b>
           {pagos.map((p) => (
-            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: '1px solid var(--linea)' }}>
+            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderTop: '1px solid var(--linea)' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700 }}>{pesos(p.monto)} <small className="suave">· {fechaPlan(p.creado_en)}</small></div>
+                <div style={{ fontWeight: 700 }}>
+                  {pesos(p.monto)} <small className="suave">· {fechaPlan(p.creado_en)}</small>
+                </div>
                 <small className="suave">
                   {p.estado === 'aprobado' && `Cubre hasta el ${fechaPlan(p.cubre_hasta)}`}
                   {p.estado === 'pendiente' && `Operación ${p.operacion}`}

@@ -7,6 +7,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import Superadmin from './Superadmin'
 import { BloqueoPlan } from './MiPlan'
+import { planPro, usePlan } from './plan'
+import { Corona } from './marca'
 import Admin from './Admin'
 import Mesera from './Mesera'
 import Turno from './Turno'
@@ -121,6 +123,7 @@ function AvisoSoporte({ restaurante }) {
   )
 }
 
+const ROL_PRO = { admin: 'Admin Pro', mesera: 'Salón Pro', cocina: 'Cocina Pro' }
 const ROL_TEXTO = { admin: 'Administración', mesera: 'Salón', cocina: 'Cocina' }
 
 // Cada perfil tiene su propio ícono en la cabecera, para distinguirlos de un vistazo.
@@ -192,11 +195,20 @@ function Panel({ sesion }) {
     marcarGuiaVista(sesion)
   }
   const clavePerfil = perfil?.es_superadmin ? 'superadmin' : (ICONO_PERFIL[miembro?.rol] ? miembro.rol : 'admin')
-  const subtitulo = perfil?.es_superadmin
-    ? 'Superadmin'
-    : miembro
-      ? `${miembro.restaurantes.nombre} · ${ROL_TEXTO[miembro.rol] ?? ''}`
-      : ''
+  // Insignia dorada "Pro": el local está al día con su mensualidad (o es piloto).
+  const plan = usePlan(perfil?.es_superadmin ? null : miembro?.restaurantes?.id)
+  const pro = !perfil?.es_superadmin && !!miembro && planPro(plan)
+  const rolTexto = ROL_TEXTO[miembro?.rol] ?? ''
+  const subtitulo = perfil?.es_superadmin ? (
+    'Superadmin'
+  ) : miembro ? (
+    <>
+      {miembro.restaurantes.nombre} ·{' '}
+      {pro ? <span className="oro-texto">{ROL_PRO[miembro.rol] ?? `${rolTexto} Pro`}</span> : rolTexto}
+    </>
+  ) : (
+    ''
+  )
 
   return (
     <div>
@@ -204,10 +216,16 @@ function Panel({ sesion }) {
         <div style={estilos.headerInterior}>
           <span
             style={estilos.logo}
-            title={ICONO_PERFIL[clavePerfil].texto}
+            className={pro ? 'oro-aro' : undefined}
+            title={pro ? `${ICONO_PERFIL[clavePerfil].texto} · Pro` : ICONO_PERFIL[clavePerfil].texto}
             aria-hidden="true"
           >
             <Icono n={ICONO_PERFIL[clavePerfil].icono} tam={22} />
+            {pro && (
+              <span className="oro-corona">
+                <Corona tam={14} />
+              </span>
+            )}
           </span>
           <div style={{ minWidth: 0, flex: 1 }}>
             <b style={estilos.marca}>{perfil ? perfil.nombre : MARCA}</b>

@@ -134,8 +134,8 @@ export default function CobroSuper() {
                   <input className="campo" style={{ width: '100%', minWidth: 0, boxSizing: 'border-box' }} inputMode="numeric" value={cfg.dias_gracia ?? ''} onChange={(e) => setCfg({ ...cfg, dias_gracia: e.target.value.replace(/\D/g, '') })} />
                 </label>
               </div>
-              <label className="etiqueta">Datos para transferir (los ve el administrador de cada local)
-                <textarea className="campo" style={{ width: '100%', boxSizing: 'border-box' }} rows={4} maxLength={600} value={cfg.datos_pago ?? ''} onChange={(e) => setCfg({ ...cfg, datos_pago: e.target.value })} placeholder={'Banco Estado · Cuenta RUT\n12.345.678-9 · Tu nombre\ncorreo@ejemplo.cl'} />
+              <label className="etiqueta">Datos para transferir: uno por línea, como «Titular: Tu nombre» (los ve el administrador de cada local)
+                <textarea className="campo" style={{ width: '100%', boxSizing: 'border-box' }} rows={6} maxLength={600} value={cfg.datos_pago ?? ''} onChange={(e) => setCfg({ ...cfg, datos_pago: e.target.value })} placeholder={'Titular: Tu nombre\nRUT: 12.345.678-9\nBanco: BancoEstado\nTipo de cuenta: Cuenta RUT\nN° de cuenta: 12345678\nCorreo: resystemapp@gmail.com'} />
               </label>
               <button className="btn btn-sec btn-chico" style={{ justifySelf: 'start' }} disabled={ocupado === 'cfg'} onClick={() => guardarCfg()}>
                 Guardar precio y datos

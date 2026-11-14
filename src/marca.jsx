@@ -3,7 +3,7 @@ export const MARCA = 'ReSystem'
 
 // Correo donde llegan las solicitudes de prueba gratis (formulario de la portada).
 // ⚠️ Escribe aquí el correo de ReSystem entre las comillas, por ejemplo: 'resystem.contacto@gmail.com'
-export const CORREO_CONTACTO = ''
+export const CORREO_CONTACTO = 'resystemapp@gmail.com'
 
 // Arma el correo con lo que llenó la persona: «mailto» abre su app de correo; el enlace de Gmail sirve en el computador.
 export function correoSolicitud(d) {
@@ -46,6 +46,15 @@ export function Logo({ tam = 28, verde = '#16a34a', tinta = '#0a0a0a', titulo })
   )
 }
 
+// El nombre dentro de un texto, con los colores del logo: «Re» en el color del texto y «System» en verde.
+export function NombreMarca() {
+  return (
+    <span className="nombre-marca">
+      Re<span>System</span>
+    </span>
+  )
+}
+
 export function Marca({ tam = 26, className = '' }) {
   return (
     <span className={`marca-resystem ${className}`}>
@@ -54,5 +63,24 @@ export function Marca({ tam = 26, className = '' }) {
         Re<span style={{ color: '#16a34a' }}>System</span>
       </span>
     </span>
+  )
+}
+
+// Corona dorada (insignia de los locales al día).
+export function Corona({ tam = 16 }) {
+  return (
+    <svg width={tam} height={tam} viewBox="0 0 24 24" aria-hidden="true">
+      <defs>
+        <linearGradient id="oro-corona" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#fef3c7" />
+          <stop offset=".45" stopColor="#fbbf24" />
+          <stop offset="1" stopColor="#b45309" />
+        </linearGradient>
+      </defs>
+      <path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z" fill="url(#oro-corona)" stroke="#92400e" strokeWidth=".7" strokeLinejoin="round" />
+      <circle cx="3" cy="8" r="1.7" fill="#fde68a" />
+      <circle cx="12" cy="5" r="1.7" fill="#fde68a" />
+      <circle cx="21" cy="8" r="1.7" fill="#fde68a" />
+    </svg>
   )
 }
