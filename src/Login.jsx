@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import Icono from './iconos'
 import { supabase } from './supabase'
 import './Login.css'
-import { Marca, WHATSAPP_VISIBLE, urlWhatsapp } from './marca'
+import { CORREO_CONTACTO, Marca, correoSolicitud } from './marca'
 import { sentir, sonar, vibrar } from './feedback'
 
 export { MARCA } from './marca'
@@ -46,7 +46,7 @@ function Marco({ children }) {
         <nav>
           <a href="#como-funciona">Cómo funciona</a>
           <a href="#plan">Plan</a>
-          <a className="lg-nav-cta" href={urlWhatsapp()} target="_blank" rel="noreferrer">
+          <a className="lg-nav-cta" href="#prueba">
             Prueba gratis
           </a>
         </nav>
@@ -58,7 +58,7 @@ function Marco({ children }) {
           <h1 className="lg-titulo">Tu restaurante, en orden. De la mesa a la cocina.</h1>
           <p className="lg-bajada">Pedidos desde la mesa con QR, cocina conectada y cobro en una sola app. Funciona en el celular, la tablet o el computador.</p>
           <div className="lg-acciones">
-            <a className="lg-btn lg-btn-negro" href={urlWhatsapp()} target="_blank" rel="noreferrer">
+            <a className="lg-btn lg-btn-negro" href="#prueba">
               Prueba 14 días gratis
             </a>
             <a className="lg-btn lg-btn-borde" href="#como-funciona">
@@ -108,11 +108,22 @@ function Marco({ children }) {
           </div>
           <div className="lg-plan-cta">
             <span className="lg-gratis">14 días gratis</span>
-            <a className="lg-btn lg-btn-blanco" href={urlWhatsapp()} target="_blank" rel="noreferrer">
-              Escríbenos por WhatsApp
+            <a className="lg-btn lg-btn-blanco" href="#prueba">
+              Solicitar prueba gratis
             </a>
-            <small>{WHATSAPP_VISIBLE}</small>
+            <small>Sin tarjeta de crédito · sin contrato</small>
           </div>
+        </div>
+      </section>
+
+      <section className="lg-seccion" id="prueba">
+        <div className="lg-prueba">
+          <div>
+            <p className="lg-eyebrow">Prueba gratis</p>
+            <h2 className="lg-h2">Prueba ReSystem 14 días en tu restaurante.</h2>
+            <p className="lg-bajada" style={{ fontSize: 16 }}>Déjanos tus datos y te contactamos para dejar tu carta y tus mesas listas. Sin costo y sin compromiso.</p>
+          </div>
+          <FormPrueba />
         </div>
       </section>
 
@@ -121,6 +132,89 @@ function Marco({ children }) {
         <span>© {new Date().getFullYear()} ReSystem · Hecho en Chile</span>
       </footer>
     </div>
+  )
+}
+
+// Formulario de prueba gratis: no guarda nada; arma un correo listo para que la persona solo toque «Enviar».
+function FormPrueba() {
+  const [d, setD] = useState({ nombre: '', restaurante: '', ciudad: '', telefono: '', correo: '', mesas: '', mensaje: '' })
+  const [error, setError] = useState('')
+  const [enlaces, setEnlaces] = useState(null)
+  const cambiar = (k) => (e) => setD({ ...d, [k]: e.target.value })
+
+  function enviar(e) {
+    e.preventDefault()
+    setError('')
+    if (!d.nombre.trim() || !d.restaurante.trim() || d.telefono.replace(/\D/g, '').length < 8) {
+      setError('Completa tu nombre, el nombre del restaurante y un teléfono válido.')
+      return
+    }
+    if (!CORREO_CONTACTO) {
+      setError('El formulario aún no tiene un correo configurado.')
+      return
+    }
+    const l = correoSolicitud(d)
+    setEnlaces(l)
+    sentir('toque')
+    window.location.href = l.mailto
+  }
+
+  return (
+    <form className="lg-form" onSubmit={enviar} noValidate>
+      <div className="lg-form-2">
+        <div className="login-campo">
+          <label htmlFor="p-nombre">Tu nombre</label>
+          <input id="p-nombre" value={d.nombre} onChange={cambiar('nombre')} autoComplete="name" maxLength={80} />
+        </div>
+        <div className="login-campo">
+          <label htmlFor="p-rest">Restaurante</label>
+          <input id="p-rest" value={d.restaurante} onChange={cambiar('restaurante')} autoComplete="organization" maxLength={80} />
+        </div>
+        <div className="login-campo">
+          <label htmlFor="p-tel">Teléfono</label>
+          <input id="p-tel" type="tel" inputMode="tel" value={d.telefono} onChange={cambiar('telefono')} autoComplete="tel" placeholder="+56 9" maxLength={20} />
+        </div>
+        <div className="login-campo">
+          <label htmlFor="p-correo">Correo <span className="lg-opc">(opcional)</span></label>
+          <input id="p-correo" type="email" value={d.correo} onChange={cambiar('correo')} autoComplete="email" maxLength={80} />
+        </div>
+        <div className="login-campo">
+          <label htmlFor="p-ciudad">Comuna o ciudad</label>
+          <input id="p-ciudad" value={d.ciudad} onChange={cambiar('ciudad')} autoComplete="address-level2" maxLength={60} />
+        </div>
+        <div className="login-campo">
+          <label htmlFor="p-mesas">¿Cuántas mesas tienen?</label>
+          <select id="p-mesas" value={d.mesas} onChange={cambiar('mesas')}>
+            <option value="">Elige una opción</option>
+            <option>1 a 5</option>
+            <option>6 a 15</option>
+            <option>16 a 30</option>
+            <option>Más de 30</option>
+          </select>
+        </div>
+      </div>
+      <div className="login-campo">
+        <label htmlFor="p-msj">Comentario <span className="lg-opc">(opcional)</span></label>
+        <textarea id="p-msj" rows={3} value={d.mensaje} onChange={cambiar('mensaje')} maxLength={500} placeholder="Ej: tenemos delivery, queremos usar la carta QR…" />
+      </div>
+      {error && (
+        <div className="login-alerta error" role="alert">
+          {error}
+        </div>
+      )}
+      <button className="login-boton">Enviar solicitud</button>
+      {enlaces ? (
+        <p className="lg-form-nota">
+          Se abrió tu app de correo con todo escrito: solo toca <b>Enviar</b>. ¿No se abrió?{' '}
+          <a href={enlaces.gmail} target="_blank" rel="noreferrer">
+            Ábrelo en Gmail
+          </a>
+          .
+        </p>
+      ) : (
+        <p className="lg-form-nota">Al tocar el botón se abre tu correo con la solicitud lista para enviar.</p>
+      )}
+    </form>
   )
 }
 

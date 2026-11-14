@@ -14,6 +14,7 @@ import ReporteMensual from './ReporteMensual'
 import Estadisticas from './Estadisticas'
 import Anclar from './Anclar'
 import MiPlan from './MiPlan'
+import { SelectorTema } from './tema'
 import { avisoPlan, estiloTono, planBloqueado, planVisible, usePlan } from './plan'
 import Icono from './iconos'
 import { sentir } from './feedback'
@@ -175,6 +176,7 @@ export default function Admin({ restaurante, scrollAlAbrir = false, conPedidos =
             </div>
           ))}
           <div className="lateral-pie">
+            <SelectorTema />
           </div>
         </nav>
 

@@ -442,6 +442,60 @@
   font-size: 14px;
 }
 
+/* ---------- Formulario de prueba gratis ---------- */
+.lg-prueba {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 56px;
+  align-items: start;
+}
+.lg-form {
+  display: grid;
+  gap: 16px;
+  padding: 28px;
+  background: #fff;
+  border: 1px solid var(--linea);
+  border-radius: 16px;
+}
+.lg-form-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.lg-form select,
+.lg-form textarea {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  border: 1px solid #d6d3d1;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--tinta);
+  font-size: 16px;
+  outline: none;
+  resize: vertical;
+}
+.lg-form select:focus,
+.lg-form textarea:focus {
+  border-color: var(--tinta);
+  box-shadow: 0 0 0 3px rgba(10, 10, 10, 0.08);
+}
+.lg-opc {
+  font-weight: 400;
+  color: var(--suave);
+}
+.lg-form-nota {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--suave);
+  text-align: center;
+  line-height: 1.5;
+}
+.lg-form-nota a {
+  color: var(--tinta);
+  font-weight: 600;
+}
+
 /* ---------- Tablet y celular ---------- */
 @media (max-width: 900px) {
   .lg-hero {
@@ -456,9 +510,15 @@
   .lg-pasos {
     gap: 28px;
   }
-  .lg-plan {
+  .lg-plan,
+  .lg-prueba {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .lg-plan {
     padding: 32px 24px;
+  }
+  .lg-prueba {
+    gap: 28px;
   }
   .lg-seccion {
     padding: 56px 20px;
@@ -488,5 +548,11 @@
   }
   .lg-acciones .lg-btn {
     flex: 1 1 100%;
+  }
+  .lg-form {
+    padding: 20px;
+  }
+  .lg-form-2 {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

@@ -1,4 +1,4 @@
-import './tema'
+import { BotonTema } from './tema'
 import Icono from './iconos'
 import Agotados from './Agotados'
 import { quitarColores } from './paletas'
@@ -93,7 +93,7 @@ function AppPersonal() {
 
 const ROL_TEXTO = { admin: 'Administración', mesera: 'Salón', cocina: 'Cocina' }
 
-// Cada perfil tiene su propio ícono y color en la cabecera, para distinguirlos de un vistazo.
+// Cada perfil tiene su propio ícono en la cabecera, para distinguirlos de un vistazo.
 const ICONO_PERFIL = {
   superadmin: { icono: 'escudo', fondo: '#0a0a0a', texto: 'Superadmin' },
   admin: { icono: 'maletin', fondo: '#0a0a0a', texto: 'Administración' },
@@ -173,7 +173,7 @@ function Panel({ sesion }) {
       <header style={estilos.header}>
         <div style={estilos.headerInterior}>
           <span
-            style={{ ...estilos.logo, background: ICONO_PERFIL[clavePerfil].fondo }}
+            style={estilos.logo}
             title={ICONO_PERFIL[clavePerfil].texto}
             aria-hidden="true"
           >
@@ -191,6 +191,7 @@ function Panel({ sesion }) {
               <Icono n="ayuda" tam={18} />
             </button>
           )}
+          <BotonTema />
           <button
             className="btn btn-chico"
             style={estilos.salir}
@@ -278,9 +279,10 @@ const estilos = {
     placeItems: 'center',
     width: 38,
     height: 38,
-    borderRadius: 12,
-    background: 'var(--marca)',
-    color: '#0b1020',
+    borderRadius: 10,
+    background: 'var(--lavanda)',
+    border: '1px solid var(--linea)',
+    color: 'var(--tinta)',
     fontSize: 19,
   },
   marca: {

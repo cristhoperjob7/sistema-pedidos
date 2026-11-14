@@ -2368,9 +2368,9 @@ const s = {
     marginTop: 12,
     padding: '16px 18px',
     borderRadius: 14,
-    color: '#ffffff',
-    background: '#0a0a0a',
-    border: '1px solid #0a0a0a',
+    color: 'var(--sobre-marca)',
+    background: 'var(--marca)',
+    border: '1px solid var(--marca)',
   },
   pagos: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px, 100%), 1fr))', gap: 10 },
 }

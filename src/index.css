@@ -8,8 +8,7 @@
   box-sizing: border-box;
 }
 
-:root,
-:root[data-tema='claro'] {
+:root {
   color-scheme: light;
   /* ---- Marca ---- */
   --marca: #0a0a0a; /* botones principales: negro */
@@ -55,6 +54,36 @@
   --radio: 12px;
   --seguro-abajo: env(safe-area-inset-bottom, 0px);
   --seguro-arriba: env(safe-area-inset-top, 0px);
+}
+
+/* ---- Modo oscuro (alternativa para descansar la vista): negro profundo, texto blanco y los mismos
+   colores de estado, más luminosos para que se lean de noche y en la cocina. ---- */
+:root[data-tema='oscuro'] {
+  color-scheme: dark;
+  --marca: #f5f5f4; /* botones principales: blancos */
+  --sobre-marca: #0a0a0a;
+  --verde: #22c55e;
+  --fondo: #0a0a0a;
+  --sup: #141414;
+  --lavanda: #1c1c1c;
+  --lavanda-2: #333333;
+  --linea: #262626;
+  --tinta: #f5f5f4;
+  --suave: #a3a3a3;
+  --menta-tinta: #4ade80;
+  --aviso-tinta: #fbbf24;
+  --rosa-tinta: #f87171;
+  --sobre-rosa: #0a0a0a;
+  --aji-claro: #d4d4d4;
+  --menta: #0f2a1a;
+  --durazno: #2a1f0a;
+  --rosa: #2a1111;
+  --cielo: #1c1c1c;
+  --borde-menta: #166534;
+  --borde-aviso: #78350f;
+  --borde-rosa: #7f1d1d;
+  --sombra: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --sombra-alta: 0 1px 2px rgba(0, 0, 0, 0.5), 0 16px 40px -14px rgba(0, 0, 0, 0.8);
 }
 
 html {
@@ -217,7 +246,7 @@ button:disabled {
 
 @media (hover: hover) {
   .btn-principal:hover:not(:disabled) {
-    background: #262626;
+    background: color-mix(in srgb, var(--marca) 85%, var(--fondo));
   }
   .btn-sec:hover:not(:disabled) {
     border-color: var(--lavanda-2);
@@ -1089,7 +1118,7 @@ a:focus-visible {
 }
 .banner-red.ok {
   background: var(--menta-tinta);
-  color: #ffffff;
+  color: var(--fondo);
 }
 .vacio .btn {
   margin-top: 6px;

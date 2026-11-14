@@ -1,9 +1,30 @@
 // Marca ReSystem: nombre, logo y contacto comercial. Cambiar aquí cambia todo el sistema.
 export const MARCA = 'ReSystem'
-export const WHATSAPP = '56959014070'
-export const WHATSAPP_VISIBLE = '+56 9 5901 4070'
-export const urlWhatsapp = (texto = 'Hola, quiero probar ReSystem 14 días gratis en mi restaurante.') =>
-  `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(texto)}`
+
+// Correo donde llegan las solicitudes de prueba gratis (formulario de la portada).
+// ⚠️ Escribe aquí el correo de ReSystem entre las comillas, por ejemplo: 'resystem.contacto@gmail.com'
+export const CORREO_CONTACTO = ''
+
+// Arma el correo con lo que llenó la persona: «mailto» abre su app de correo; el enlace de Gmail sirve en el computador.
+export function correoSolicitud(d) {
+  const asunto = `Prueba gratis ReSystem · ${d.restaurante}`
+  const cuerpo = [
+    'Hola, quiero probar ReSystem 14 días gratis.',
+    '',
+    `Nombre: ${d.nombre}`,
+    `Restaurante: ${d.restaurante}`,
+    `Comuna o ciudad: ${d.ciudad || '-'}`,
+    `Teléfono: ${d.telefono}`,
+    `Correo: ${d.correo || '-'}`,
+    `Mesas aproximadas: ${d.mesas || '-'}`,
+    '',
+    d.mensaje ? `Comentario: ${d.mensaje}` : '',
+  ].join('\n')
+  return {
+    mailto: `mailto:${CORREO_CONTACTO}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`,
+    gmail: `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(CORREO_CONTACTO)}&su=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`,
+  }
+}
 
 // Las esquinas de un código QR y, en la cuarta, un plato. «tinta» = color del plato (negro sobre claro).
 export function Logo({ tam = 28, verde = '#16a34a', tinta = '#0a0a0a', titulo }) {
